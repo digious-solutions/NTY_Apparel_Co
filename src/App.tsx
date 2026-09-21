@@ -28,6 +28,8 @@ const Auth = lazy(() => import("./pages/Auth.tsx"));
 const Account = lazy(() => import("./pages/Account.tsx"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe.tsx"));
 const NattyVerified = lazy(() => import("./pages/NattyVerified.tsx"));
+const PartnerProgramsForm = lazy(() => import("./pages/PartnerProgram.tsx"));
+const SetPassword = lazy(() => import("./pages/SetPassword.tsx"));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -65,12 +67,14 @@ const App = () => (
               <Route path="/partners" element={<Partners />} />
               <Route path="/bench-club" element={<BenchClub />} />
               <Route path="/bench-club-shop" element={<BenchClubShop />} />
+              <Route path="/set-password" element={<SetPassword />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/natty-verification" element={<NattyVerified />} />
+              <Route path="/partner-program" element={<PartnerProgramsForm />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

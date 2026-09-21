@@ -25,3 +25,7 @@ dist-ssr
 
 .env
 g.envnew
+
+DB_Backup
+
+affliates_system.sql

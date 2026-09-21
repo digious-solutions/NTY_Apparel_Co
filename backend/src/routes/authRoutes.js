@@ -395,4 +395,157 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// ✅ Verify invite token
+router.get('/verify-invite/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const [rows] = await pool.execute(
+      `SELECT email, application_id, used, expires_at 
+       FROM user_invites 
+       WHERE token = ? AND used = 0 AND expires_at > NOW()`,
+      [token]
+    );
+
+    if (!rows.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired invite link.',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        email: rows[0].email,
+        application_id: rows[0].application_id,
+      },
+    });
+  } catch (error) {
+    console.error('Verify invite error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify invite.',
+    });
+  }
+});
+
+// ✅ Set password with invite token
+router.post('/set-password', async (req, res) => {
+  try {
+    const { token, name, password } = req.body;
+
+    if (!token || !name || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required.',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 6 characters.',
+      });
+    }
+
+    // Verify token
+    const [invites] = await pool.execute(
+      `SELECT email, application_id 
+       FROM user_invites 
+       WHERE token = ? AND used = 0 AND expires_at > NOW()`,
+      [token]
+    );
+
+    if (!invites.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired invite link.',
+      });
+    }
+
+    const invite = invites[0];
+
+    // Check if user already exists
+    const [existingUsers] = await pool.execute(
+      'SELECT id FROM users WHERE email = ?',
+      [invite.email]
+    );
+
+    let userId;
+
+    if (existingUsers.length > 0) {
+      // User exists - update password
+      userId = existingUsers[0].id;
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await pool.execute(
+        'UPDATE users SET password_hash = ?, name = ? WHERE id = ?',
+        [hashedPassword, name.trim(), userId]
+      );
+    } else {
+      // Create new user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const [result] = await pool.execute(
+        `INSERT INTO users (name, email, password_hash, role, created_at) 
+         VALUES (?, ?, ?, 'customer', NOW())`,
+        [name.trim(), invite.email, hashedPassword]
+      );
+      userId = result.insertId;
+    }
+
+    // ✅ Link applications to this user
+    await pool.execute(
+      `UPDATE bench_club_applications 
+       SET user_id = ? 
+       WHERE email = ? AND user_id IS NULL`,
+      [userId, invite.email]
+    );
+
+    // ✅ Link members to this user
+    await pool.execute(
+      `UPDATE bench_club_members 
+       SET user_id = ? 
+       WHERE email = ? AND user_id IS NULL`,
+      [userId, invite.email]
+    );
+
+    // Mark invite as used
+    await pool.execute(
+      'UPDATE user_invites SET used = 1 WHERE token = ?',
+      [token]
+    );
+
+    // Generate JWT token
+    const jwt = (await import('jsonwebtoken')).default;
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+    const authToken = jwt.sign(
+      { id: userId, email: invite.email, role: 'customer' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Password set successfully!',
+      data: {
+        user: {
+          id: userId,
+          name: name.trim(),
+          email: invite.email,
+          role: 'customer',
+        },
+        token: authToken,
+      },
+    });
+
+  } catch (error) {
+    console.error('Set password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to set password.',
+    });
+  }
+});
+
+
 export default router;
