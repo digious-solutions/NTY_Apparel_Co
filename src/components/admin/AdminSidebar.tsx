@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Mail,
   Gift,
+  Send,
   Dumbbell,
   LogOut,
 } from "lucide-react";
@@ -37,6 +38,8 @@ export const menuItems = [
   { title: "Customers", icon: Users },
   { title: "Affiliates", icon: UserCheck },
   { title: "Bench Club", icon: Dumbbell },
+  { title: "Deadlift", icon: Dumbbell },
+  { title: "Generate Invites", icon: Send },
   { title: "Coupons", icon: Ticket },
   { title: "Messages", icon: MessageSquare },
   { title: "Didn't Pay", icon: XCircle },

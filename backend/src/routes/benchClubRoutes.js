@@ -1,6 +1,7 @@
+// src/routes/benchClubRoutes.js
 import express from 'express';
 import { pool } from '../db/index.js';
-import jwt from 'jsonwebtoken'; // ✅ Import jwt
+import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -60,7 +61,7 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowedTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm', 'video/quicktime'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -71,7 +72,7 @@ const upload = multer({
   },
 });
 
-// ✅ NEW: Video Upload Route
+// ✅ Video Upload Route
 router.post('/upload-video', authenticateToken, upload.single('video'), async (req, res) => {
   try {
     if (!req.file) {
@@ -102,7 +103,7 @@ router.post('/upload-video', authenticateToken, upload.single('video'), async (r
   }
 });
 
-// ✅ Submit Application - No Email
+// ✅ Submit Application
 router.post('/apply', authenticateToken, async (req, res) => {
   const startTime = Date.now();
 
@@ -119,16 +120,14 @@ router.post('/apply', authenticateToken, async (req, res) => {
       additionalNotes,
     } = req.body;
 
-    // ✅ Validation - Fast check
     if (!user_id || !fullName || !email || !socialHandle || !lift || !weightTier || !videoUrl) {
       return res.status(400).json({
         success: false,
         error: 'All required fields must be filled.',
-        required: ['user_id', 'fullName', 'email', 'socialHandle', 'lift', 'weightTier', 'videoUrl']
+        required: ['user_id', 'fullName', 'email', 'socialHandle', 'lift', 'weightTier', 'videoUrl'],
       });
     }
 
-    // ✅ Check user exists
     const [userCheck] = await pool.execute(
       'SELECT COUNT(*) as count FROM users WHERE id = ?',
       [user_id]
@@ -143,7 +142,6 @@ router.post('/apply', authenticateToken, async (req, res) => {
       });
     }
 
-    // ✅ Insert application
     const [result] = await pool.execute(
       `INSERT INTO bench_club_applications 
        (user_id, full_name, email, instagram_handle, phone_number, lift_type, weight_tier, video_url, additional_notes, status, created_at) 
@@ -167,7 +165,6 @@ router.post('/apply', authenticateToken, async (req, res) => {
 
     console.log(`✅ Application submitted in ${responseTime}ms, ID: ${insertId}`);
 
-    // ✅ Send immediate response - NO EMAIL
     res.status(201).json({
       success: true,
       message: 'Application submitted successfully!',
@@ -184,7 +181,6 @@ router.post('/apply', authenticateToken, async (req, res) => {
     const responseTime = Date.now() - startTime;
     console.error(`❌ Submit Error (${responseTime}ms):`, error);
 
-    // ✅ Check for duplicate entry
     if (error && error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
         success: false,
@@ -266,10 +262,10 @@ router.get('/my-member', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all applications with filters (Admin)
+// ✅ Get all applications (Admin) - with lift_type filter
 router.get('/applications', async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, lift_type } = req.query;
 
     let query = `
       SELECT 
@@ -278,6 +274,7 @@ router.get('/applications', async (req, res) => {
         email, 
         phone_number as phone, 
         instagram_handle, 
+        lift_type,
         weight_tier, 
         video_url, 
         additional_notes as notes, 
@@ -287,10 +284,20 @@ router.get('/applications', async (req, res) => {
     `;
 
     const params = [];
+    const conditions = [];
 
     if (status && status !== 'all') {
-      query += ' WHERE status = ?';
+      conditions.push('status = ?');
       params.push(status);
+    }
+
+    if (lift_type) {
+      conditions.push('lift_type = ?');
+      params.push(lift_type);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY created_at DESC';
@@ -310,8 +317,7 @@ router.get('/applications', async (req, res) => {
   }
 });
 
-// Approve application (Admin)
-
+// ✅ Approve application (Admin)
 router.put('/applications/:id/approve', async (req, res) => {
   const connection = await pool.getConnection();
 
@@ -320,9 +326,8 @@ router.put('/applications/:id/approve', async (req, res) => {
 
     await connection.beginTransaction();
 
-    // ✅ Get application details
     const [apps] = await connection.execute(
-      'SELECT user_id, full_name, email, weight_tier FROM bench_club_applications WHERE id = ? AND status = "pending"',
+      'SELECT user_id, full_name, email, lift_type, weight_tier FROM bench_club_applications WHERE id = ? AND status = "pending"',
       [id]
     );
 
@@ -332,14 +337,13 @@ router.put('/applications/:id/approve', async (req, res) => {
 
     const app = apps[0];
 
-    // ✅ Check if user already has this tier approved (by user_id + weight_tier)
+    // ✅ Check if user already has this tier for SAME lift type
     const [existingMember] = await connection.execute(
-      'SELECT id, weight_tier, member_number FROM bench_club_members WHERE user_id = ? AND weight_tier = ?',
-      [app.user_id, app.weight_tier]
+      'SELECT id, weight_tier, member_number FROM bench_club_members WHERE user_id = ? AND weight_tier = ? AND lift_type = ?',
+      [app.user_id, app.weight_tier, app.lift_type]
     );
 
     if (existingMember.length > 0) {
-      // ✅ Already has this tier - just update application status
       await connection.execute(
         'UPDATE bench_club_applications SET status = ?, updated_at = NOW() WHERE id = ?',
         ['approved', id]
@@ -347,27 +351,23 @@ router.put('/applications/:id/approve', async (req, res) => {
 
       await connection.commit();
 
-      const member = existingMember[0];
-
       return res.json({
         success: true,
-        data: member || null,
-        message: `User already has ${app.weight_tier} lb tier. Application approved!`,
+        data: existingMember[0] || null,
+        message: `User already has ${app.weight_tier} lb ${app.lift_type} tier. Application approved!`,
         isDuplicate: true,
       });
     }
 
-    // ✅ Check if user exists with DIFFERENT tier (same email or same user_id)
+    // ✅ Check if user exists with DIFFERENT tier for SAME lift type
     const [existingUser] = await connection.execute(
-      'SELECT id, user_id, weight_tier, member_number FROM bench_club_members WHERE user_id = ? OR email = ?',
-      [app.user_id, app.email]
+      'SELECT id, user_id, weight_tier, member_number FROM bench_club_members WHERE user_id = ? AND lift_type = ?',
+      [app.user_id, app.lift_type]
     );
 
     if (existingUser.length > 0) {
-      // ✅ User already exists with different tier - UPDATE existing member
       const existing = existingUser[0];
 
-      // ✅ Update existing member with new tier
       await connection.execute(
         `UPDATE bench_club_members 
          SET weight_tier = ?, 
@@ -377,7 +377,6 @@ router.put('/applications/:id/approve', async (req, res) => {
         [app.weight_tier, id, existing.id]
       );
 
-      // ✅ Update application status
       await connection.execute(
         'UPDATE bench_club_applications SET status = ?, updated_at = NOW() WHERE id = ?',
         ['approved', id]
@@ -385,7 +384,6 @@ router.put('/applications/:id/approve', async (req, res) => {
 
       await connection.commit();
 
-      // ✅ Get updated member data
       const [memberResult] = await connection.execute(
         'SELECT * FROM bench_club_members WHERE id = ?',
         [existing.id]
@@ -394,26 +392,24 @@ router.put('/applications/:id/approve', async (req, res) => {
       return res.json({
         success: true,
         data: memberResult[0] || null,
-        message: `Member upgraded to ${app.weight_tier} lb tier! Member #${String(existing.member_number).padStart(4, '0')}`,
+        message: `Member upgraded to ${app.weight_tier} lb ${app.lift_type} tier! Member #${String(existing.member_number).padStart(4, '0')}`,
         isUpgrade: true,
       });
     }
 
-    // ✅ New user - Create new member
+    // ✅ New member - Create new
     const [countResult] = await connection.execute(
       'SELECT MAX(member_number) as max_num FROM bench_club_members'
     );
     const nextNumber = (countResult[0]?.max_num || 0) + 1;
 
-    // ✅ Insert new member
     await connection.execute(
       `INSERT INTO bench_club_members 
-       (user_id, full_name, email, weight_tier, member_number, application_id) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [app.user_id, app.full_name, app.email, app.weight_tier, nextNumber, id]
+       (user_id, full_name, email, lift_type, weight_tier, member_number, application_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [app.user_id, app.full_name, app.email, app.lift_type, app.weight_tier, nextNumber, id]
     );
 
-    // ✅ Update application status
     await connection.execute(
       'UPDATE bench_club_applications SET status = ?, updated_at = NOW() WHERE id = ?',
       ['approved', id]
@@ -421,7 +417,6 @@ router.put('/applications/:id/approve', async (req, res) => {
 
     await connection.commit();
 
-    // ✅ Get new member data
     const [memberResult] = await connection.execute(
       'SELECT * FROM bench_club_members WHERE application_id = ?',
       [id]
@@ -454,16 +449,13 @@ router.put('/applications/:id/approve', async (req, res) => {
   }
 });
 
-// Reject application (Admin)
-// src/routes/benchClubRoutes.ts
-
+// ✅ Reject application (Admin)
 router.put('/applications/:id/reject', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // ✅ Check if application exists and is pending
     const [apps] = await pool.execute(
-      'SELECT id, user_id, weight_tier FROM bench_club_applications WHERE id = ? AND status = "pending"',
+      'SELECT id, user_id, weight_tier, lift_type FROM bench_club_applications WHERE id = ? AND status = "pending"',
       [id]
     );
 
@@ -476,20 +468,18 @@ router.put('/applications/:id/reject', async (req, res) => {
 
     const app = apps[0];
 
-    // ✅ Check if user already has this tier (to prevent rejecting an already approved tier)
     const [existingMember] = await pool.execute(
-      'SELECT id FROM bench_club_members WHERE user_id = ? AND weight_tier = ?',
-      [app.user_id, app.weight_tier]
+      'SELECT id FROM bench_club_members WHERE user_id = ? AND weight_tier = ? AND lift_type = ?',
+      [app.user_id, app.weight_tier, app.lift_type]
     );
 
     if (existingMember.length > 0) {
       return res.status(400).json({
         success: false,
-        error: `User already has ${app.weight_tier} lb tier. Cannot reject.`,
+        error: `User already has ${app.weight_tier} lb ${app.lift_type} tier. Cannot reject.`,
       });
     }
 
-    // ✅ Update application status
     const [result] = await pool.execute(
       'UPDATE bench_club_applications SET status = ?, updated_at = NOW() WHERE id = ?',
       ['rejected', id]
@@ -513,23 +503,33 @@ router.put('/applications/:id/reject', async (req, res) => {
   }
 });
 
-// src/routes/benchClubRoutes.ts
-
-// ✅ Add this route after other routes
-// Get all members (Admin)
+// ✅ Get all members (Admin) - with lift_type filter
 router.get('/members', async (req, res) => {
   try {
-    const [rows] = await pool.execute(
-      `SELECT 
+    const { lift_type } = req.query;
+
+    let query = `
+      SELECT 
         id, 
         full_name as name, 
         email, 
+        lift_type,
         weight_tier, 
         member_number, 
         created_at as approved_at 
-      FROM bench_club_members 
-      ORDER BY created_at DESC`
-    );
+      FROM bench_club_members
+    `;
+
+    const params = [];
+
+    if (lift_type) {
+      query += ' WHERE lift_type = ?';
+      params.push(lift_type);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const [rows] = await pool.execute(query, params);
 
     res.json({
       success: true,
@@ -544,16 +544,14 @@ router.get('/members', async (req, res) => {
   }
 });
 
-// ✅ Profile Update Route (with authentication)
+// ✅ Profile Update Route
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    // ✅ Get userId from authenticated token
     const userId = req.user.id;
     const { name, email } = req.body;
 
     console.log('📝 Updating profile for user:', userId, { name, email });
 
-    // ✅ Build dynamic query - only update fields that are provided
     let updateFields = [];
     let values = [];
 
@@ -574,7 +572,6 @@ router.put('/profile', authenticateToken, async (req, res) => {
       });
     }
 
-    // ✅ Add userId to values array
     values.push(userId);
 
     const query = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
@@ -589,7 +586,6 @@ router.put('/profile', authenticateToken, async (req, res) => {
       });
     }
 
-    // ✅ Get updated user data
     const [rows] = await pool.execute(
       'SELECT id, name, email, role FROM users WHERE id = ?',
       [userId]

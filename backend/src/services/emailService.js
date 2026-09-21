@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// ✅ SMTP Configuration
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.office365.com';
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_SECURE_RAW = (process.env.SMTP_SECURE || '').toLowerCase().trim();
@@ -15,7 +14,6 @@ const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || 'noreply@local.test';
 const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || 'NATTY';
 
-// ✅ Create Transporter
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
@@ -35,7 +33,6 @@ const transporter = nodemailer.createTransport({
   rateLimit: 5,
 });
 
-// ✅ Verify Connection
 export const verifyEmailConnection = async () => {
   try {
     await transporter.verify();
@@ -47,8 +44,6 @@ export const verifyEmailConnection = async () => {
   }
 };
 
-
-// ✅ Send Email Function
 export const sendEmail = async (to, template) => {
   try {
     const mailOptions = {
@@ -68,7 +63,6 @@ export const sendEmail = async (to, template) => {
   }
 };
 
-// ✅ OTP Email Template
 export const getOTPEmailTemplate = (otp, expiresInMinutes = 10) => {
   return {
     subject: '🔐 Password Reset OTP - NATTY',
@@ -134,7 +128,6 @@ export const getOTPEmailTemplate = (otp, expiresInMinutes = 10) => {
   };
 };
 
-// ✅ Bench Club Application Received Email
 export const getBenchClubReceivedEmail = (name, tier) => {
   return {
     subject: '✅ Bench Club Application Received - NATTY Apparel',
@@ -194,7 +187,6 @@ export const getBenchClubReceivedEmail = (name, tier) => {
   };
 };
 
-// ✅ Generic Email
 export const getGenericEmail = (subject, content) => {
   return {
     subject,
@@ -231,4 +223,141 @@ export const getGenericEmail = (subject, content) => {
     `,
     text: content.replace(/<[^>]*>/g, ''),
   };
+};
+
+export const getSetPasswordEmailTemplate = (name, setPasswordLink) => {
+  const subject = `🔐 Set Your NTY Apparel Password, ${name}!`;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Arial', sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #B8860B; }
+        .header h1 { font-size: 24px; color: #1a1a1a; margin: 0; }
+        .header span { color: #B8860B; }
+        .content { padding: 30px 0; }
+        .content h2 { color: #1a1a1a; font-size: 22px; margin-bottom: 15px; }
+        .content p { color: #555; font-size: 15px; line-height: 1.8; }
+        .button { display: inline-block; background: #B8860B; color: white; padding: 14px 35px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top: 20px; }
+        .footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }
+        .warning { background: #fff3cd; padding: 12px; border-radius: 5px; color: #856404; font-size: 13px; margin-top: 15px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>NTY <span>APPAREL</span></h1>
+          <p style="color: #666; font-size: 14px; margin: 5px 0 0;">Set Your Password</p>
+        </div>
+        <div class="content">
+          <h2>Hey ${name},</h2>
+          <p>We've upgraded our system! To access your Bench Club dashboard, orders, and exclusive gear, you need to set a password for your account.</p>
+          <p>Click the button below to set your password:</p>
+          <p style="text-align: center;">
+            <a href="${setPasswordLink}" class="button" style="color:white !Important">Set My Password</a>
+          </p>
+          <div class="warning" style="text-align:center !important;">
+            ⏳ This link expires in 7 days.
+          </div>
+        </div>
+        <div class="footer">
+          <p>NTY Apparel &bull; Built for the natural athlete</p>
+          <p style="margin-top: 5px;">© ${new Date().getFullYear()} NTY Apparel. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  return { subject, html };
+};
+
+export const getAffiliateApprovedEmailTemplate = (
+  name,
+  code,
+  link,
+  discountPercent,
+  commissionPercent
+) => {
+  const subject = `🎉 You're Approved! Your Affiliate Code: ${code}`;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Arial', sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #B8860B; }
+        .header h1 { font-size: 24px; color: #1a1a1a; margin: 0; }
+        .header span { color: #B8860B; }
+        .content { padding: 30px 0; }
+        .content h2 { color: #1a1a1a; font-size: 22px; margin-bottom: 15px; }
+        .content p { color: #555; font-size: 15px; line-height: 1.8; }
+        .code-box { background: #f8f4e8; border: 2px dashed #B8860B; border-radius: 10px; padding: 20px; text-align: center; margin: 25px 0; }
+        .code { font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #1a1a1a; font-family: monospace; }
+        .stats { display: flex; gap: 10px; margin: 20px 0; }
+        .stat { flex: 1; background: #f8f8f8; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #B8860B; }
+        .stat-label { font-size: 12px; color: #666; text-transform: uppercase; }
+        .button { display: inline-block; background: #B8860B; color: white; padding: 14px 35px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top: 20px; }
+        .footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>NTY <span>APPAREL</span></h1>
+          <p style="color: #666; font-size: 14px; margin: 5px 0 0;">Partner Program</p>
+        </div>
+        <div class="content">
+          <h2>🎉 Welcome to the team, ${name}!</h2>
+          <p>Your affiliate application has been <strong>approved</strong>. You're now an official NTY Partner!</p>
+
+          <div class="code-box">
+            <p style="font-size: 14px; color: #666; margin-bottom: 10px;">Your unique referral code:</p>
+            <div class="code">${code}</div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-value">${discountPercent}%</div>
+              <div class="stat-label">Customer Discount</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value">${commissionPercent}%</div>
+              <div class="stat-label">Your Commission</div>
+            </div>
+          </div>
+
+          <p><strong>Your referral link:</strong></p>
+          <p style="background: #f0f0f0; padding: 10px; border-radius: 5px; word-break: break-all; font-family: monospace; font-size: 13px;">
+            ${link}
+          </p>
+
+          <p style="text-align: center;">
+            <a href="${link}" class="button">Start Sharing</a>
+          </p>
+
+          <p style="font-size: 14px; color: #666; margin-top: 25px;">
+            <strong>How it works:</strong>
+          </p>
+          <ul style="color: #666; font-size: 14px; line-height: 2;">
+            <li>Share your link or code with your audience</li>
+            <li>They get ${discountPercent}% off their order</li>
+            <li>You earn ${commissionPercent}% commission on every sale</li>
+            <li>Track your earnings in your dashboard</li>
+          </ul>
+        </div>
+        <div class="footer">
+          <p>NTY Apparel &bull; Built for the natural athlete</p>
+          <p style="margin-top: 5px;">© ${new Date().getFullYear()} NTY Apparel. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  return { subject, html };
 };

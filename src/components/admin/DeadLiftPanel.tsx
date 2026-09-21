@@ -34,7 +34,7 @@ const TABS = [
 
 const API_URL = import.meta.env.VITE_API_URL || "https://ghostwhite-scorpion-772089.hostingersite.com";
 
-export function BenchClubPanel() {
+export function DeadLiftPanel() {
   const [tab, setTab] = useState<"applications" | "members">("applications");
   const [apps, setApps] = useState<App[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -53,8 +53,8 @@ export function BenchClubPanel() {
     setRefreshing(true);
 
     try {
-      // ✅ Fetch applications - ONLY BENCH PRESS
-      const appsRes = await fetch(`${API_URL}/api/bench-club/applications?status=all&lift_type=Bench Press`);
+      // ✅ Fetch applications - ONLY Dead lift
+      const appsRes = await fetch(`${API_URL}/api/bench-club/applications?status=all&lift_type=Deadlift`);
 
       if (!appsRes.ok) {
         const errorText = await appsRes.text();
@@ -66,7 +66,7 @@ export function BenchClubPanel() {
       if (appsData.success) {
         // ✅ Filter only Bench Press on frontend too (double safety)
         const benchPressApps = (appsData.data || []).filter(
-          (app: App) => app.lift_type?.toLowerCase() === 'bench press'
+          (app: App) => app.lift_type?.toLowerCase() === 'deadlift'
         );
         setApps(benchPressApps);
       } else {
@@ -74,7 +74,7 @@ export function BenchClubPanel() {
       }
 
       // ✅ Fetch members - ONLY BENCH PRESS
-      const membersRes = await fetch(`${API_URL}/api/bench-club/members?lift_type=Bench Press`);
+      const membersRes = await fetch(`${API_URL}/api/bench-club/members?lift_type=Deadlift`);
 
       if (!membersRes.ok) {
         const errorText = await membersRes.text();
@@ -86,7 +86,7 @@ export function BenchClubPanel() {
       if (membersData.success) {
         // ✅ Filter only Bench Press on frontend too (double safety)
         const benchPressMembers = (membersData.data || []).filter(
-          (member: Member) => member.lift_type?.toLowerCase() === 'bench press'
+          (member: Member) => member.lift_type?.toLowerCase() === 'deadlift'
         );
         setMembers(benchPressMembers);
       } else {
@@ -232,10 +232,10 @@ export function BenchClubPanel() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-[hsl(222,47%,11%)] flex items-center gap-2">
-              <Dumbbell className="w-6 h-6" /> Bench Club
+              <Dumbbell className="w-6 h-6" /> Dead Lift
             </h1>
             <p className="text-sm text-[hsl(215,16%,47%)] mt-1">
-              Review Bench Press applications and manage verified members.
+              Review Deadlift applications and manage verified members.
             </p>
           </div>
           <button
@@ -313,7 +313,7 @@ export function BenchClubPanel() {
             <div className="bg-white rounded-lg border border-[hsl(214,32%,91%)] p-12 text-center">
               <Dumbbell className="w-10 h-10 mx-auto text-[hsl(215,16%,47%)] mb-3" />
               <p className="text-sm text-[hsl(215,16%,47%)]">
-                No {filter !== 'all' ? filter : ''} Bench Press applications found.
+                No {filter !== 'all' ? filter : ''} Deadlift applications found.
               </p>
             </div>
           ) : (
@@ -405,7 +405,7 @@ export function BenchClubPanel() {
           ) : members.length === 0 ? (
             <div className="bg-white rounded-lg border border-[hsl(214,32%,91%)] p-12 text-center">
               <Trophy className="w-10 h-10 mx-auto text-[hsl(215,16%,47%)] mb-3" />
-              <p className="text-sm text-[hsl(215,16%,47%)]">No verified Bench Press members yet.</p>
+              <p className="text-sm text-[hsl(215,16%,47%)]">No verified Dead Lift members yet.</p>
             </div>
           ) : (
             members.map((m) => (

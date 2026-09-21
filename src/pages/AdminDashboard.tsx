@@ -4,7 +4,9 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { DashboardOverview } from "@/components/admin/DashboardOverview";
 import { AffiliatesPanel } from "@/components/admin/AffiliatesPanel";
 import { BenchClubPanel } from "@/components/admin/BenchClubPanel";
+import { DeadLiftPanel } from "@/components/admin/DeadLiftPanel";
 import { OrdersPanel } from "@/components/admin/OrdersPanel";
+import { GenerateInvitesPanel } from "@/components/GenerateInvitesPanel";
 
 const AdminDashboard = () => {
   const [active, setActive] = useState("Overview");
@@ -41,7 +43,7 @@ const AdminDashboard = () => {
                 <span className="ml-3 text-sm font-medium text-[hsl(222,47%,11%)]" style={{ fontFamily: 'Inter, sans-serif' }}>{active}</span>
               </header>
               <main className="flex-1 overflow-auto p-6">
-                {active === "Affiliates" ? <AffiliatesPanel /> : active === "Bench Club" ? <BenchClubPanel /> : active === "Orders" ? <OrdersPanel /> : <DashboardOverview />}
+                {active === "Affiliates" ? <AffiliatesPanel /> : active === "Bench Club" ? <BenchClubPanel /> : active === "Generate Invites" ? <GenerateInvitesPanel /> : active === "Deadlift" ? <DeadLiftPanel /> : active === "Orders" ? <OrdersPanel /> : <DashboardOverview />}
               </main>
             </div>
           </div>
