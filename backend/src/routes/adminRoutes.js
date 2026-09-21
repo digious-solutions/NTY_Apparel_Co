@@ -65,7 +65,7 @@ router.post('/generate-invites', async (req, res) => {
         console.log(`✨ Generated new invite for ${app.email}`);
       }
 
-      const link = `http://localhost:8080/set-password?token=${token}`;
+      const link = `https://login.ntygear.com/set-password?token=${token}`;
 
       invites.push({
         email: app.email,
@@ -143,7 +143,7 @@ router.post('/send-bulk-invites', async (req, res) => {
         );
 
         const name = apps[0]?.full_name || 'Member';
-        const link = `http://localhost:8080/set-password?token=${invite.token}`;
+        const link = `https://login.ntygear.com/set-password?token=${invite.token}`;
 
         const template = getSetPasswordEmailTemplate(name, link);
         await sendEmail(invite.email, template);
@@ -227,7 +227,7 @@ router.post('/send-invite', async (req, res) => {
     );
 
     const name = apps[0]?.full_name || 'Member';
-    const link = `http://localhost:8080/set-password?token=${invite.token}`;
+    const link = `https://login.ntygear.com/set-password?token=${invite.token}`;
 
     const template = getSetPasswordEmailTemplate(name, link);
     await sendEmail(email, template);
