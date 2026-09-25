@@ -32,7 +32,7 @@ const TABS = [
   { id: "members", label: "Members" },
 ] as const;
 
-const API_URL = import.meta.env.VITE_API_URL || "https://ghostwhite-scorpion-772089.hostingersite.com";
+const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 
 export function DeadLiftPanel() {
   const [tab, setTab] = useState<"applications" | "members">("applications");

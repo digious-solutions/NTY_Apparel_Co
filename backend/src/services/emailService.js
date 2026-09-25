@@ -241,7 +241,6 @@ export const getSetPasswordEmailTemplate = (name, setPasswordLink) => {
         .content { padding: 30px 0; }
         .content h2 { color: #1a1a1a; font-size: 22px; margin-bottom: 15px; }
         .content p { color: #555; font-size: 15px; line-height: 1.8; }
-        .button { display: inline-block; background: #B8860B; color: white; padding: 14px 35px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top: 20px; }
         .footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }
         .warning { background: #fff3cd; padding: 12px; border-radius: 5px; color: #856404; font-size: 13px; margin-top: 15px; }
       </style>
@@ -254,14 +253,31 @@ export const getSetPasswordEmailTemplate = (name, setPasswordLink) => {
         </div>
         <div class="content">
           <h2>Hey ${name},</h2>
-          <p>We've upgraded our system! To access your Bench Club dashboard, orders, and exclusive gear, you need to set a password for your account.</p>
+          <p>We've upgraded our system! To access your Bench Club dashboard, and exclusive gear, you need to set a password for your account.</p>
           <p>Click the button below to set your password:</p>
-          <p style="text-align: center;">
-            <a href="${setPasswordLink}" class="button" style="color:white !Important">Set My Password</a>
-          </p>
+          
+          <!-- BULLETPROOF BUTTON -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+            <tr>
+              <td align="center" bgcolor="#B8860B" style="border-radius:5px;">
+                <a href="${setPasswordLink}" 
+                   target="_blank" 
+                   style="display:inline-block; padding:14px 35px; font-family:Arial,sans-serif; font-size:15px; font-weight:bold; color:#ffffff !important; text-decoration:none; border-radius:5px; background-color:#B8860B;">
+                  Set My Password
+                </a>
+              </td>
+            </tr>
+          </table>
           <div class="warning" style="text-align:center !important;">
             ⏳ This link expires in 7 days.
           </div>
+          <div class="warning" style="text-align:center !important;">
+            "We're getting close to the full launch of the new site. In the meantime, Bench Club members already have Early Access to their earned Bench Club gear. If you'd like to get yours before the full launch, you can access it here."
+          </div>
+          <p style="text-align:center !important;">For US members: </p>
+           <p style="text-align:center !important;">https://buy.stripe.com/9B68wH0SE0zq22xboi8IU02</p>
+          <p style="text-align:center !important;">For international members:</p>
+          <p style="text-align:center !important;">https://buy.stripe.com/5kQ3cn7h2fuk4aF63Y8IU06</p>
         </div>
         <div class="footer">
           <p>NTY Apparel &bull; Built for the natural athlete</p>

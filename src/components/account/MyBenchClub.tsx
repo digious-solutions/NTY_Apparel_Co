@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 const DISCORD_INVITE = "https://discord.gg/nty-bench-club";
-const API_URL = import.meta.env.VITE_API_URL || "https://ghostwhite-scorpion-772089.hostingersite.com";
+const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 
 const TIERS = [
   { lbs: 225, name: "225 Club", desc: "The foundation. Two plates a side." },

@@ -22,7 +22,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = (import.meta.env.VITE_API_URL || 'https://ghostwhite-scorpion-772089.hostingersite.com').replace(/\/+$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || 'https://slategrey-cattle-753687.hostingersite.com').replace(/\/+$/, '');
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

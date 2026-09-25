@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://ghostwhite-scorpion-772089.hostingersite.com";
+const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 
 const FOLLOWER_RANGES = ["< 1,000", "1,000 – 5,000", "5,000 – 10,000", "10,000 – 50,000", "50,000 – 100,000", "100,000 – 500,000", "500,000+"];
 const FIND_OPTIONS = ["Instagram", "TikTok", "YouTube", "Friend / referral", "Search engine", "Already a customer", "Other"];
