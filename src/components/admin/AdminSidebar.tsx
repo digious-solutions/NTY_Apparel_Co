@@ -39,7 +39,7 @@ export const menuItems = [
   { title: "Affiliates", icon: UserCheck },
   { title: "Bench Club", icon: Dumbbell },
   { title: "Deadlift", icon: Dumbbell },
-  // { title: "Generate Invites", icon: Send }, 
+  { title: "Generate Invites", icon: Send }, 
   { title: "Coupons", icon: Ticket },
   { title: "Messages", icon: MessageSquare },
   { title: "Didn't Pay", icon: XCircle },
