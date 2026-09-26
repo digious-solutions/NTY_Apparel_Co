@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { Check, X, Dumbbell, Mail, Phone, Instagram, ExternalLink, Trophy, RefreshCw, Play, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { EditMemberModal } from "./EditMemberModal";
+import { Edit } from "lucide-react";
+import { EditApplicationModal } from "./EditApplicationModal";
 
 type App = {
   id: number;
@@ -42,6 +45,9 @@ export function BenchClubPanel() {
   const [busy, setBusy] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  // Inside component
+  const [editingApp, setEditingApp] = useState<App | null>(null);
 
   // ✅ Video Modal State
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -85,9 +91,10 @@ export function BenchClubPanel() {
       const membersData = await membersRes.json();
       if (membersData.success) {
         // ✅ Filter only Bench Press on frontend too (double safety)
-        const benchPressMembers = (membersData.data || []).filter(
-          (member: Member) => member.lift_type?.toLowerCase() === 'bench press'
-        );
+        const benchPressMembers = (membersData.data || []).filter((member: Member) => {
+          const lt = member.lift_type?.toLowerCase();
+          return lt === 'bench press' || lt === 'both';
+        });
         setMembers(benchPressMembers);
       } else {
         throw new Error(membersData.error || "Failed to fetch members");
@@ -255,8 +262,8 @@ export function BenchClubPanel() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`text-sm px-4 py-2.5 -mb-px border-b-2 transition-colors ${tab === t.id
-                ? "border-[hsl(211,100%,50%)] text-[hsl(211,100%,50%)] font-medium"
-                : "border-transparent text-[hsl(215,16%,47%)] hover:text-[hsl(222,47%,11%)]"
+              ? "border-[hsl(211,100%,50%)] text-[hsl(211,100%,50%)] font-medium"
+              : "border-transparent text-[hsl(215,16%,47%)] hover:text-[hsl(222,47%,11%)]"
               }`}
           >
             {t.label} {t.id === "applications" ? `(${pendingCount})` : `(${members.length})`}
@@ -270,8 +277,8 @@ export function BenchClubPanel() {
             <button
               onClick={() => setFilter("pending")}
               className={`text-sm px-4 py-2 rounded-lg border transition-colors ${filter === "pending"
-                  ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
-                  : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
+                ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
+                : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
                 }`}
             >
               Pending ({pendingCount})
@@ -279,8 +286,8 @@ export function BenchClubPanel() {
             <button
               onClick={() => setFilter("approved")}
               className={`text-sm px-4 py-2 rounded-lg border transition-colors ${filter === "approved"
-                  ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
-                  : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
+                ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
+                : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
                 }`}
             >
               Approved ({approvedCount})
@@ -288,8 +295,8 @@ export function BenchClubPanel() {
             <button
               onClick={() => setFilter("rejected")}
               className={`text-sm px-4 py-2 rounded-lg border transition-colors ${filter === "rejected"
-                  ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
-                  : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
+                ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
+                : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
                 }`}
             >
               Rejected ({rejectedCount})
@@ -297,8 +304,8 @@ export function BenchClubPanel() {
             <button
               onClick={() => setFilter("all")}
               className={`text-sm px-4 py-2 rounded-lg border transition-colors ${filter === "all"
-                  ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
-                  : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
+                ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
+                : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
                 }`}
             >
               All ({allCount})
@@ -332,10 +339,10 @@ export function BenchClubPanel() {
                         </span>
                         <span
                           className={`text-xs px-2.5 py-0.5 rounded-full ${a.status === "approved"
-                              ? "bg-green-100 text-green-700"
-                              : a.status === "rejected"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-yellow-100 text-yellow-700"
+                            ? "bg-green-100 text-green-700"
+                            : a.status === "rejected"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-yellow-100 text-yellow-700"
                             }`}
                         >
                           {a.status}
@@ -385,6 +392,14 @@ export function BenchClubPanel() {
                           >
                             <X className="w-4 h-4" /> Reject
                           </button>
+                          <button
+                            onClick={() => setEditingApp(a)}
+                            disabled={busy === a.id}
+                            className="bg-white text-[hsl(222,47%,11%)] border border-[hsl(214,32%,91%)] text-sm font-medium px-3 py-2 rounded-lg hover:bg-[hsl(210,40%,96%)] disabled:opacity-50 flex items-center gap-2 transition-colors"
+                            title="Edit application"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -396,6 +411,16 @@ export function BenchClubPanel() {
         </>
       )}
 
+      {/* ✅ Edit Application Modal */}
+      {editingApp && (
+        <EditApplicationModal
+          application={editingApp}
+          apiUrl={API_URL}
+          onClose={() => setEditingApp(null)}
+          onSaved={() => loadData(false)}
+        />
+      )}
+      
       {tab === "members" && (
         <div className="space-y-3">
           {loading ? (
@@ -410,26 +435,45 @@ export function BenchClubPanel() {
           ) : (
             members.map((m) => (
               <div key={m.id} className="bg-white rounded-lg border border-[hsl(214,32%,91%)] p-5 flex items-center justify-between gap-4 hover:shadow-sm transition-shadow">
-                <div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <p className="text-base font-semibold text-[hsl(222,47%,11%)]">{m.name}</p>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">
-                      {m.weight_tier} Club
-                    </span>
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
-                      {m.lift_type}
-                    </span>
+                <div className="flex gap-3">
+                  <div>
+                    <p className="text-xs text-[hsl(215,16%,47%)]">Member</p>
+                    <p className="text-lg font-bold text-[hsl(222,47%,11%)]">#{String(m.member_number).padStart(4, "0")}</p>
                   </div>
-                  <p className="text-sm text-[hsl(215,16%,47%)] mt-1">{m.email}</p>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="text-base font-semibold text-[hsl(222,47%,11%)]">{m.name}</p>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">
+                        {m.weight_tier} Club
+                      </span>
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
+                        {m.lift_type === "Both" ? "Bench Press" : m.lift_type}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[hsl(215,16%,47%)] mt-1">{m.email}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-[hsl(215,16%,47%)]">Member</p>
-                  <p className="text-lg font-bold text-[hsl(222,47%,11%)]">#{String(m.member_number).padStart(4, "0")}</p>
-                </div>
+                <button
+                  onClick={() => setEditingMember(m)}
+                  className="p-2 rounded-lg hover:bg-gray-100"
+                  title="Edit member"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
               </div>
             ))
           )}
         </div>
+      )}
+
+      {/* Modal */}
+      {editingMember && (
+        <EditMemberModal
+          member={editingMember}
+          apiUrl={API_URL}
+          onClose={() => setEditingMember(null)}
+          onSaved={() => loadData(false)}
+        />
       )}
 
       {/* ✅ Video Modal */}

@@ -269,17 +269,10 @@ router.get('/applications', async (req, res) => {
 
     let query = `
       SELECT 
-        id, 
-        full_name as name, 
-        email, 
-        phone_number as phone, 
-        instagram_handle, 
-        lift_type,
-        weight_tier, 
-        video_url, 
-        additional_notes as notes, 
-        status, 
-        created_at 
+        id, full_name as name, email, 
+        phone_number as phone, instagram_handle, 
+        lift_type, weight_tier, video_url, 
+        additional_notes as notes, status, created_at
       FROM bench_club_applications
     `;
 
@@ -292,8 +285,9 @@ router.get('/applications', async (req, res) => {
     }
 
     if (lift_type) {
-      conditions.push('lift_type = ?');
-      params.push(lift_type);
+      // ✅ "Both" applications bhi dikhao specific club filter par
+      conditions.push('(lift_type = ? OR lift_type = ?)');
+      params.push(lift_type, 'Both');
     }
 
     if (conditions.length > 0) {
@@ -303,17 +297,10 @@ router.get('/applications', async (req, res) => {
     query += ' ORDER BY created_at DESC';
 
     const [rows] = await pool.execute(query, params);
-
-    res.json({
-      success: true,
-      data: rows,
-    });
+    res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Fetch applications error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch applications.',
-    });
+    res.status(500).json({ success: false, error: 'Failed to fetch applications.' });
   }
 });
 
@@ -503,6 +490,94 @@ router.put('/applications/:id/reject', async (req, res) => {
   }
 });
 
+// ✅ PUT /api/bench-club/applications/:id
+// Sirf pending applications edit ho sakti hain
+router.put('/applications/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      full_name,
+      email,
+      phone_number,
+      instagram_handle,
+      lift_type,
+      weight_tier,
+      additional_notes,
+    } = req.body;
+
+    // ✅ Pehle check karo ke application pending hai ya nahi
+    const [existing] = await pool.execute(
+      'SELECT id, status FROM bench_club_applications WHERE id = ?',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Application not found' });
+    }
+
+    if (existing[0].status !== 'pending') {
+      return res.status(403).json({
+        success: false,
+        error: `Cannot edit ${existing[0].status} applications. Only pending applications can be edited.`,
+      });
+    }
+
+    // Validation
+    if (weight_tier !== undefined) {
+      const tier = parseInt(weight_tier, 10);
+      if (isNaN(tier) || tier < 0 || tier > 2000) {
+        return res.status(400).json({ success: false, error: 'Invalid weight tier' });
+      }
+    }
+
+    if (lift_type && !['Bench Press', 'Deadlift', 'Both'].includes(lift_type)) {
+      return res.status(400).json({ success: false, error: 'Invalid lift type' });
+    }
+
+    // ✅ Correct column names
+    const [result] = await pool.execute(
+      `UPDATE bench_club_applications 
+       SET full_name = COALESCE(?, full_name),
+           email = COALESCE(?, email),
+           phone_number = COALESCE(?, phone_number),
+           instagram_handle = COALESCE(?, instagram_handle),
+           lift_type = COALESCE(?, lift_type),
+           weight_tier = COALESCE(?, weight_tier),
+           additional_notes = COALESCE(?, additional_notes)
+       WHERE id = ? AND status = 'pending'`,
+      [
+        full_name || null,
+        email ? email.trim().toLowerCase() : null,
+        phone_number || null,
+        instagram_handle || null,
+        lift_type || null,
+        weight_tier !== undefined ? parseInt(weight_tier, 10) : null,
+        additional_notes !== undefined ? additional_notes : null,
+        id,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Application not found' });
+    }
+
+    // Return updated row
+    const [rows] = await pool.execute(
+      `SELECT 
+        id, full_name as name, email, phone_number as phone,
+        instagram_handle, lift_type, weight_tier, video_url,
+        additional_notes as notes, status, created_at
+       FROM bench_club_applications WHERE id = ?`,
+      [id]
+    );
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('Update application error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ✅ Get all members (Admin) - with lift_type filter
 router.get('/members', async (req, res) => {
   try {
@@ -510,37 +585,132 @@ router.get('/members', async (req, res) => {
 
     let query = `
       SELECT 
-        id, 
-        full_name as name, 
-        email, 
-        lift_type,
-        weight_tier, 
-        member_number, 
-        created_at as approved_at 
+        id, full_name as name, email, 
+        lift_type, weight_tier, 
+        member_number, created_at as approved_at
       FROM bench_club_members
     `;
 
     const params = [];
 
     if (lift_type) {
-      query += ' WHERE lift_type = ?';
-      params.push(lift_type);
+      query += ' WHERE (lift_type = ? OR lift_type = ?)';
+      params.push(lift_type, 'Both');
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY member_number ASC';
 
     const [rows] = await pool.execute(query, params);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Fetch members error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch members.' });
+  }
+});
+
+// ✅ PUT /api/bench-club/members/:id
+router.put('/members/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { full_name, email, lift_type, weight_tier, member_number } = req.body;
+
+    // Validate
+    if (lift_type && !['Bench Press', 'Deadlift', 'Both'].includes(lift_type)) {
+      return res.status(400).json({ success: false, error: 'Invalid lift type' });
+    }
+    if (weight_tier !== undefined) {
+      const tier = parseInt(weight_tier, 10);
+      if (isNaN(tier) || tier < 0 || tier > 2000) {
+        return res.status(400).json({ success: false, error: 'Invalid weight tier' });
+      }
+    }
+
+    // member_number UNIQUE check
+    if (member_number !== undefined) {
+      const num = parseInt(member_number, 10);
+      if (isNaN(num) || num <= 0) {
+        return res.status(400).json({ success: false, error: 'Invalid member number' });
+      }
+      const [existing] = await pool.execute(
+        'SELECT id FROM bench_club_members WHERE member_number = ? AND id != ?',
+        [num, id]
+      );
+      if (existing.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: `Member number ${num} already taken`,
+        });
+      }
+    }
+
+    const [result] = await pool.execute(
+      `UPDATE bench_club_members 
+       SET full_name = COALESCE(?, full_name),
+           email = COALESCE(?, email),
+           lift_type = COALESCE(?, lift_type),
+           weight_tier = COALESCE(?, weight_tier),
+           member_number = COALESCE(?, member_number)
+       WHERE id = ?`,
+      [
+        full_name || null,
+        email ? email.trim().toLowerCase() : null,
+        lift_type || null,
+        weight_tier !== undefined ? parseInt(weight_tier, 10) : null,
+        member_number !== undefined ? parseInt(member_number, 10) : null,
+        id,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Member not found' });
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT 
+        id, full_name as name, email, lift_type, weight_tier, 
+        member_number, created_at as approved_at
+       FROM bench_club_members WHERE id = ?`,
+      [id]
+    );
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('Update member error:', err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, error: 'Member number already exists' });
+    }
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ✅ DELETE /api/bench-club/members/:id
+router.delete('/members/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [member] = await pool.execute(
+      `SELECT id, full_name, email, lift_type, weight_tier, member_number
+       FROM bench_club_members WHERE id = ?`,
+      [id]
+    );
+
+    if (member.length === 0) {
+      return res.status(404).json({ success: false, error: 'Member not found' });
+    }
+
+    const m = member[0];
+
+    await pool.execute('DELETE FROM bench_club_members WHERE id = ?', [id]);
+
+    console.log(`🗑️ Member deleted:`, m);
 
     res.json({
       success: true,
-      data: rows,
+      message: `Member ${m.full_name} (#${String(m.member_number).padStart(4, '0')}) removed`,
     });
-  } catch (error) {
-    console.error('Fetch members error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch members.',
-    });
+  } catch (err) {
+    console.error('Delete member error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
