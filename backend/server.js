@@ -100,7 +100,6 @@ app.use('/api/email', emailRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/affiliate', affiliateRoutes);
 
-
 // API Route: Submit Application
 app.post('/api/bench-club/apply', upload.single('video'), async (req, res) => {
   try {
