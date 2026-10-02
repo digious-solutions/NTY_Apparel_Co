@@ -13,10 +13,10 @@ const TABS = [
   { id: "applications", label: "Applications" },
   { id: "affiliates", label: "Active" },
   { id: "coupons", label: "Coupons" },
-  { id: "referrals", label: "Referrals" },
-  { id: "visits", label: "Visits" },
-  { id: "payouts", label: "Payouts" },
-  { id: "messages", label: "Messages" },
+  // { id: "referrals", label: "Referrals" },
+  // { id: "visits", label: "Visits" },
+  // { id: "payouts", label: "Payouts" },
+  // { id: "messages", label: "Messages" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -47,10 +47,10 @@ export function AffiliatesPanel() {
       {tab === "applications" && <ApplicationsTab />}
       {tab === "affiliates" && <AffiliatesTab />}
       {tab === "coupons" && <CouponsTab />}
-      {tab === "referrals" && <ReferralsTab />}
+      {/* {tab === "referrals" && <ReferralsTab />}
       {tab === "visits" && <VisitsTab />}
       {tab === "payouts" && <PayoutsTab />}
-      {tab === "messages" && <MessagesTab />}
+      {tab === "messages" && <MessagesTab />} */}
     </div>
   );
 }
