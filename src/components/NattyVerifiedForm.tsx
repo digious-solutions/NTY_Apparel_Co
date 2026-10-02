@@ -34,7 +34,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const liftOptions = ["Bench Press", "Deadlift"];
-  const weightOptions = ["225", "315", "405"];
+  const weightOptions = ["225", "315", "405", "500", "600", "700"];
 
   // ✅ Auto-fill user data when logged in
   useEffect(() => {
@@ -194,14 +194,13 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
 
       // 3. Send confirmation email (background)
       try {
-        await fetch(`${API_URL}/api/email/send`, {
+        await fetch(`${API_URL}/api/email/bench-club-received`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: email.trim().toLowerCase(),
             name: fullName.trim().split(" ")[0],
             tier: weightTier,
-            type: "bench-club-received",
           }),
         });
       } catch (emailError) {

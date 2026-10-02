@@ -3,7 +3,7 @@ import express from 'express';
 import { pool } from '../db/index.js';
 import crypto from 'crypto';
 import { sendEmail, getAffiliateApprovedEmailTemplate } from '../services/emailService.js';
-import { createShopifyDiscount } from '../services/shopifyService.js';
+import { createShopifyDiscount, disableShopifyDiscount, enableShopifyDiscount } from '../services/shopifyService.js';
 
 const router = express.Router();
 
@@ -387,7 +387,8 @@ router.put('/admin/coupons/:id/toggle', async (req, res) => {
     const { id } = req.params;
 
     const [coupons] = await pool.execute(
-      'SELECT active FROM affiliate_coupon_links WHERE id = ?',
+      `SELECT active, code, discount_percent, shopify_price_rule_id, shopify_discount_code_id
+       FROM affiliate_coupon_links WHERE id = ?`,
       [id]
     );
 
@@ -400,10 +401,49 @@ router.put('/admin/coupons/:id/toggle', async (req, res) => {
 
     const newStatus = coupons[0].active ? 0 : 1;
 
-    await pool.execute(
-      'UPDATE affiliate_coupon_links SET active = ? WHERE id = ?',
-      [newStatus, id]
-    );
+    if (!newStatus && coupons[0].shopify_discount_code_id && !coupons[0].shopify_price_rule_id) {
+      return res.status(409).json({
+        success: false,
+        error: 'Shopify price rule ID is missing; coupon was not disabled.',
+      });
+    }
+
+    if (!newStatus && coupons[0].shopify_price_rule_id) {
+      await disableShopifyDiscount(coupons[0].shopify_price_rule_id);
+    }
+
+    if (newStatus) {
+      // Agar pehle se price rule ID hai, toh sirf re-enable karo
+      if (coupons[0].shopify_price_rule_id) {
+        const { enableShopifyDiscount } = await import('../services/shopifyService.js');
+        await enableShopifyDiscount(coupons[0].shopify_price_rule_id);
+
+        await pool.execute(
+          `UPDATE affiliate_coupon_links SET active = ? WHERE id = ?`,
+          [newStatus, id]
+        );
+      } else {
+        // Naya discount banao
+        const shopifyDiscount = await createShopifyDiscount({
+          code: coupons[0].code,
+          discountPercent: Number(coupons[0].discount_percent),
+        });
+
+        await pool.execute(
+          `UPDATE affiliate_coupon_links
+       SET active = ?, shopify_price_rule_id = ?, shopify_discount_code_id = ?
+       WHERE id = ?`,
+          [newStatus, shopifyDiscount.priceRuleId, shopifyDiscount.discountCodeId, id]
+        );
+      }
+    } else {
+      await pool.execute(
+        `UPDATE affiliate_coupon_links
+     SET active = ?
+     WHERE id = ?`,
+        [newStatus, id]
+      );
+    }
 
     res.json({
       success: true,
@@ -416,6 +456,172 @@ router.put('/admin/coupons/:id/toggle', async (req, res) => {
       success: false,
       error: 'Failed to toggle coupon.',
     });
+  }
+});
+
+// ============================================
+// ADMIN: Get Analytics (Top Sellers + Stats)
+// ============================================
+router.get('/admin/analytics', async (req, res) => {
+  try {
+    // Application counts
+    const [appCounts] = await pool.execute(
+      `SELECT status, COUNT(*) as count FROM affiliate_applications GROUP BY status`
+    );
+    const counts = { pending: 0, approved: 0, rejected: 0 };
+    for (const row of appCounts) {
+      if (counts[row.status] !== undefined) counts[row.status] = row.count;
+    }
+
+    // Total approved affiliates
+    const [affCount] = await pool.execute(
+      `SELECT COUNT(*) as total FROM affiliates WHERE status = 'approved'`
+    );
+
+    // All referrals
+    const [refs] = await pool.execute(
+      `SELECT affiliate_id, order_amount, commission_amount, created_at
+       FROM affiliate_referrals
+       ORDER BY created_at DESC`
+    );
+
+    // Affiliate names
+    const [affs] = await pool.execute(
+      `SELECT id, name, email FROM affiliates WHERE status = 'approved'`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        counts,
+        totalAffiliates: affCount[0].total,
+        referrals: refs,
+        affiliates: affs,
+      },
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch analytics.',
+    });
+  }
+});
+
+// ============================================
+// SHOPIFY WEBHOOK: Order Paid
+// ============================================
+
+router.post('/webhooks/shopify/orders-paid', async (req, res) => {
+  const rawBody = req.body;
+  const hmac = req.get('X-Shopify-Hmac-Sha256');
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  if (!Buffer.isBuffer(rawBody) || !hmac || !secret) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
+  if (hash !== hmac) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  let order;
+  try {
+    order = JSON.parse(rawBody.toString('utf8'));
+  } catch {
+    return res.status(400).json({ error: 'Invalid webhook payload' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    const shopifyOrderId = String(order.id);
+    const shopifyOrderNumber = String(order.name || order.order_number || '');
+    const customerEmail = order.email || order.contact_email || null;
+    const orderAmount = parseFloat(order.total_price) || 0;
+
+    const discountCodes = (order.discount_codes || [])
+      .map((dc) => String(dc.code).toUpperCase().trim())
+      .filter(Boolean);
+
+    if (discountCodes.length === 0) {
+      return res.status(200).json({ skipped: true, reason: 'no discount codes' });
+    }
+
+    const placeholders = discountCodes.map(() => '?').join(',');
+    const [coupons] = await connection.execute(
+      `SELECT acl.id, acl.affiliate_id, acl.code, acl.commission_percent
+       FROM affiliate_coupon_links acl
+       WHERE acl.code IN (${placeholders}) AND acl.active = 1`,
+      discountCodes
+    );
+
+    if (coupons.length === 0) {
+      return res.status(200).json({ skipped: true, reason: 'no matching affiliate coupon' });
+    }
+
+    await connection.beginTransaction();
+    const processed = [];
+
+    for (const coupon of coupons) {
+      // Duplicate check
+      const [existing] = await connection.execute(
+        `SELECT id FROM affiliate_referrals 
+         WHERE shopify_order_id = ? AND affiliate_id = ?`,
+        [shopifyOrderId, coupon.affiliate_id]
+      );
+      if (existing.length > 0) continue;
+
+      const commissionPercent = parseFloat(coupon.commission_percent) || 0;
+      const commissionAmount = Number((orderAmount * (commissionPercent / 100)).toFixed(2));
+
+      // 1️⃣ Referral insert
+      await connection.execute(
+        `INSERT INTO affiliate_referrals 
+         (affiliate_id, shopify_order_id, shopify_order_number, customer_email, 
+          coupon_code, order_amount, commission_amount, commission_percent, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+        [
+          coupon.affiliate_id,
+          shopifyOrderId,
+          shopifyOrderNumber,
+          customerEmail,
+          coupon.code,
+          orderAmount,
+          commissionAmount,
+          commissionPercent,
+        ]
+      );
+
+      // 2️⃣ Coupon uses_count increment
+      await connection.execute(
+        `UPDATE affiliate_coupon_links 
+         SET uses_count = uses_count + 1 
+         WHERE id = ?`,
+        [coupon.id]
+      );
+
+      // 3️⃣ Affiliate stats update
+      await connection.execute(
+        `UPDATE affiliates 
+         SET earnings = earnings + ?,
+             total_uses = total_uses + 1
+         WHERE id = ?`,
+        [commissionAmount, coupon.affiliate_id]
+      );
+
+      processed.push(coupon.code);
+    }
+
+    await connection.commit();
+
+    console.log(`✅ Webhook processed: ${processed.join(', ')}`);
+    res.status(200).json({ success: true, processed });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Webhook error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
   }
 });
 

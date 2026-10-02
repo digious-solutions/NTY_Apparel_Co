@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Trophy, TrendingUp, DollarSign, Users, BarChart3 } from "lucide-react";
-import { fmtMoney, textStyle } from "./types";
+import { fmtMoney, textStyle, API_URL } from "./types";
 
 type Referral = {
   affiliate_id: string | null;
@@ -24,13 +23,14 @@ function aggregate(refs: Referral[], affs: Map<string, Aff>): Agg[] {
   const m = new Map<string, Agg>();
   for (const r of refs) {
     if (!r.affiliate_id) continue;
-    const aff = affs.get(r.affiliate_id);
+    const aff = affs.get(String(r.affiliate_id));
     if (!aff) continue;
-    const cur = m.get(r.affiliate_id) || { id: r.affiliate_id, name: aff.name, revenue: 0, commission: 0, sales: 0 };
+    const key = String(r.affiliate_id);
+    const cur = m.get(key) || { id: key, name: aff.name, revenue: 0, commission: 0, sales: 0 };
     cur.revenue += Number(r.order_amount || 0);
     cur.commission += Number(r.commission_amount || 0);
     cur.sales += 1;
-    m.set(r.affiliate_id, cur);
+    m.set(key, cur);
   }
   return [...m.values()].sort((a, b) => b.revenue - a.revenue);
 }
@@ -107,34 +107,30 @@ export function TopSellersSection() {
 
   const load = async () => {
     setLoading(true);
-    const since = startOfLastMonth();
-    const [{ data: r }, { data: a }, { data: apps }] = await Promise.all([
-      supabase.from("affiliate_referrals").select("affiliate_id,order_amount,commission_amount,created_at").gte("created_at", "2020-01-01"),
-      supabase.from("affiliates").select("id,name,email").eq("status", "approved"),
-      supabase.from("affiliate_applications").select("status"),
-    ]);
-    setRefs((r as Referral[]) || []);
-    setAffs((a as Aff[]) || []);
-    const c = { pending: 0, approved: 0, rejected: 0 };
-    for (const ap of (apps as any[]) || []) {
-      if (ap.status === "pending") c.pending++;
-      else if (ap.status === "approved") c.approved++;
-      else if (ap.status === "rejected") c.rejected++;
+    try {
+      const res = await fetch(`${API_URL}/api/affiliate/admin/analytics`);
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed to load");
+
+      setRefs(data.data.referrals || []);
+      setAffs(data.data.affiliates || []);
+      setCounts(data.data.counts || { pending: 0, approved: 0, rejected: 0 });
+    } catch (error) {
+      console.error("Analytics load error:", error);
+    } finally {
+      setLoading(false);
     }
-    setCounts(c);
-    setLoading(false);
   };
 
   useEffect(() => {
     load();
-    const ch = supabase
-      .channel("affs-top")
-      .on("postgres_changes", { event: "*", schema: "public", table: "affiliate_referrals" }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    // Auto-refresh every 60 seconds
+    const interval = setInterval(load, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  const affMap = useMemo(() => new Map(affs.map((a) => [a.id, a])), [affs]);
+  const affMap = useMemo(() => new Map(affs.map((a) => [String(a.id), a])), [affs]);
 
   const allTime = useMemo(() => aggregate(refs, affMap), [refs, affMap]);
   const thisMonth = useMemo(() => {

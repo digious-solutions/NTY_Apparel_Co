@@ -15,7 +15,7 @@ type Referral = { id: string; order_number: string | null; customer_email: strin
 type Payout = { id: string; amount: number; status: string; created_at: string; paid_at: string | null };
 type Visit = { id: string; created_at: string; path: string | null; country: string | null };
 
-const SITE_URL = "https://ntyapparel.com";
+const SITE_URL = "https://ntygear.com";
 const BYPASS_EMAILS = ["gattbilly3@gmail.com", "gattbilly5@gmail.com", "preview@ntyapparel.com"];
 
 const TIERS = [

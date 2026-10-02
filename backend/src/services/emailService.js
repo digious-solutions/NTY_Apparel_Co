@@ -318,7 +318,7 @@ export const getAffiliateApprovedEmailTemplate = (
         .stat { flex: 1; background: #f8f8f8; padding: 15px; border-radius: 8px; text-align: center; }
         .stat-value { font-size: 24px; font-weight: bold; color: #B8860B; }
         .stat-label { font-size: 12px; color: #666; text-transform: uppercase; }
-        .button { display: inline-block; background: #B8860B; color: white; padding: 14px 35px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top: 20px; }
+        .button { display: inline-block; background: #B8860B; color: white !important; padding: 14px 35px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top: 20px; }
         .footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }
       </style>
     </head>

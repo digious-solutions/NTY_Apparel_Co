@@ -10,8 +10,8 @@ import benchClubRoutes from './src/routes/benchClubRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import emailRoutes from './src/routes/emailRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
-import affiliateRoutes from './src/routes/affiliateRoutes.js';
 import webhookRoutes from './src/routes/webhookRoutes.js';
+import affiliateRoutes from './src/routes/affiliateRoutes.js';
 
 dotenv.config();
 
@@ -26,6 +26,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+app.use('/api/webhooks', express.raw({ type: 'application/json' }));
+app.use('/api/affiliate/webhooks/shopify', express.raw({ type: 'application/json' }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -93,13 +95,12 @@ const uploadToCloudinary = async (fileBuffer, fileName) => {
   });
 };
 
-app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+app.use('/api/webhooks', webhookRoutes);
 app.use('/api/bench-club', benchClubRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/affiliate', affiliateRoutes);
-
 
 // API Route: Submit Application
 app.post('/api/bench-club/apply', upload.single('video'), async (req, res) => {
