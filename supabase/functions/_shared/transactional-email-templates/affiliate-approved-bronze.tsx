@@ -19,7 +19,7 @@ interface Props {
   discount_percent?: number | string
 }
 
-const SITE = 'https://ntyapparel.com'
+const SITE = 'https://ntygear.com'
 
 const Email = ({ first_name, code, link, commission_percent, discount_percent }: Props) => {
   const name = first_name?.trim() || 'there'
@@ -69,7 +69,7 @@ export const template = {
   component: Email,
   subject: "You're In — Welcome to Bronze · Natty Apparel Affiliate",
   displayName: 'Affiliate Approved — Bronze',
-  previewData: { first_name: 'Alex', code: 'ALEX10', link: 'https://ntyapparel.com/?ref=ALEX10', commission_percent: 10, discount_percent: 10 },
+  previewData: { first_name: 'Alex', code: 'ALEX10', link: 'https://ntygear.com/?ref=ALEX10', commission_percent: 10, discount_percent: 10 },
 } satisfies TemplateEntry
 
 const main = { backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif' }

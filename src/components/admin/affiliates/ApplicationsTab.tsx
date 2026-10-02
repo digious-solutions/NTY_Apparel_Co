@@ -1,63 +1,76 @@
+// components/affiliates/ApplicationsTab.tsx
 import { useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Check, Instagram, Music2, Mail, Users as UsersIcon, X, Phone, ChevronDown, ChevronUp, AtSign, Info, HelpCircle, StickyNote } from "lucide-react";
+import {
+  Check, Instagram, Music2, Mail, Users as UsersIcon, X,
+  Phone, ChevronDown, ChevronUp, AtSign, Info, HelpCircle, StickyNote,
+  RefreshCw, Zap,
+} from "lucide-react";
 import { toast } from "sonner";
-import { fmtNum, generateCode, SITE_URL, textStyle } from "./types";
+import { API_URL, fmtNum, generateCode, SITE_URL, textStyle } from "./types";
 
 type App = {
-  id: string;
+  id: number;
   name: string;
   email: string;
   status: string;
   created_at: string;
   instagram_handle: string | null;
   instagram_followers: number | null;
-  tiktok_handle: string | null;
   tiktok_followers: number | null;
-  audience_description: string | null;
-  why_join: string | null;
-  first_name?: string | null;
-  last_name?: string | null;
-  phone?: string | null;
-  social_handles?: string | null;
-  total_followers_range?: string | null;
-  platform_info?: string | null;
-  how_did_you_find?: string | null;
-  additional_notes?: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  social_handles: string | null;
+  total_followers_range: string | null;
+  platform_info: string | null;
+  how_did_you_find: string | null;
+  additional_notes: string | null;
 };
 
 export function ApplicationsTab() {
   const [rows, setRows] = useState<App[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
-  const load = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("affiliate_applications")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setRows((data as App[]) || []);
-    setLoading(false);
+  // ✅ Load Applications from MySQL
+  const load = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    setRefreshing(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/affiliate/admin/applications?status=all`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load applications");
+      }
+
+      setRows(data.data || []);
+    } catch (error) {
+      console.error("Load error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to load applications");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
     load();
-    const ch = supabase
-      .channel("apps")
-      .on("postgres_changes", { event: "*", schema: "public", table: "affiliate_applications" }, load)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    // Auto-refresh every 30s
+    const interval = setInterval(() => load(false), 30000);
+    return () => clearInterval(interval);
   }, []);
 
+  // ✅ Approve Dialog State
   const [approveDialog, setApproveDialog] = useState<App | null>(null);
   const [approveCode, setApproveCode] = useState("");
   const [approveDiscount, setApproveDiscount] = useState(10);
   const [approveCommission, setApproveCommission] = useState(15);
+  const [approving, setApproving] = useState(false);
 
   const openApprove = (a: App) => {
     setApproveDialog(a);
@@ -66,100 +79,78 @@ export function ApplicationsTab() {
     setApproveCommission(15);
   };
 
+  // ✅ Approve Application (with Shopify)
   const confirmApprove = async () => {
     if (!approveDialog) return;
-    const a = approveDialog;
+
     const code = approveCode.trim().toUpperCase();
-    if (!code) { toast.error("Code required"); return; }
-    setBusy(a.id);
+    if (!code) {
+      toast.error("Code required");
+      return;
+    }
+
+    setApproving(true);
     try {
-      const { data: aff, error: e1 } = await supabase
-        .from("affiliates")
-        .insert({
-          name: a.name,
-          email: a.email,
-          status: "approved",
-          instagram_handle: a.instagram_handle,
-          instagram_followers: a.instagram_followers,
-          tiktok_handle: a.tiktok_handle,
-          tiktok_followers: a.tiktok_followers,
-          referral_code: code,
-          approved_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-      if (e1) throw e1;
-
-      // Deactivate any prior link with this code (idempotent re-approve)
-      await supabase.from("affiliate_coupon_links").update({ active: false }).eq("code", code);
-
-      const { error: e2 } = await supabase.from("affiliate_coupon_links").insert({
-        affiliate_id: aff!.id,
-        code,
-        discount_percent: approveDiscount,
-        commission_percent: approveCommission,
-        active: true,
-      });
-      if (e2) throw e2;
-
-      // Register as a usable checkout coupon (customer-facing discount)
-      const { error: e3 } = await supabase.from("generated_coupons").insert({
-        code,
-        email: a.email,
-        amount: approveDiscount,
-        discount_type: "percent",
-        source: "affiliate",
-        usage_limit: 100000,
-      });
-      if (e3) console.warn("generated_coupons insert:", e3.message);
-
-      await supabase
-        .from("affiliate_applications")
-        .update({ status: "approved", reviewed_at: new Date().toISOString() })
-        .eq("id", a.id);
-
-      const link = `${SITE_URL}/?ref=${code}`;
-      const tierTemplate =
-        approveCommission >= 20
-          ? "affiliate-approved-gold"
-          : approveCommission >= 15
-          ? "affiliate-approved-silver"
-          : "affiliate-approved-bronze";
-      supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: tierTemplate,
-          recipientEmail: a.email,
-          idempotencyKey: `affiliate-approved-${a.id}-${tierTemplate}`,
-          templateData: {
-            first_name: (a.first_name || a.name || "").split(" ")[0],
+      const res = await fetch(
+        `${API_URL}/api/affiliate/admin/applications/${approveDialog.id}/approve`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             code,
-            link,
-            commission_percent: approveCommission,
-            discount_percent: approveDiscount,
-          },
-        },
-      });
+            discountPercent: approveDiscount,
+            commissionPercent: approveCommission,
+          }),
+        }
+      );
 
-      toast.success(`Approved — ${code} live · ${approveDiscount}% off / ${approveCommission}% commission`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Approval failed");
+      }
+
+      // ✅ Check Shopify creation status
+      if (data.data?.shopify?.created) {
+        toast.success(`✅ Approved! ${code} live on Shopify (${approveDiscount}% off / ${approveCommission}% commission)`);
+      } else if (data.data?.shopify?.error) {
+        toast.warning(`Approved, but Shopify failed: ${data.data.shopify.error}`);
+      } else {
+        toast.success(`Approved! ${code} is now live`);
+      }
+
       setApproveDialog(null);
-      load();
-    } catch (e) {
-      console.error(e);
-      toast.error("Approval failed");
+      await load(false);
+    } catch (error) {
+      console.error("Approval error:", error);
+      toast.error(error instanceof Error ? error.message : "Approval failed");
     } finally {
-      setBusy(null);
+      setApproving(false);
     }
   };
 
+  // ✅ Reject Application
   const reject = async (a: App) => {
     setBusy(a.id);
-    await supabase
-      .from("affiliate_applications")
-      .update({ status: "rejected", reviewed_at: new Date().toISOString() })
-      .eq("id", a.id);
-    setBusy(null);
-    toast.success("Rejected");
-    load();
+    try {
+      const res = await fetch(
+        `${API_URL}/api/affiliate/admin/applications/${a.id}/reject`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Rejection failed");
+      }
+
+      toast.success("Application rejected");
+      await load(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Rejection failed");
+    } finally {
+      setBusy(null);
+    }
   };
 
   const filtered = rows.filter((r) => (filter === "all" ? true : r.status === filter));
@@ -172,7 +163,8 @@ export function ApplicationsTab() {
 
   return (
     <div style={textStyle}>
-      <div className="flex gap-2 mb-6">
+      {/* Filter Bar */}
+      <div className="flex gap-2 mb-6 flex-wrap items-center">
         {(["pending", "approved", "rejected", "all"] as const).map((f) => (
           <button
             key={f}
@@ -182,19 +174,29 @@ export function ApplicationsTab() {
                 ? "bg-[hsl(211,100%,50%)] text-white border-[hsl(211,100%,50%)]"
                 : "bg-white text-[hsl(222,47%,11%)] border-[hsl(214,32%,91%)] hover:bg-[hsl(210,40%,96%)]"
             }`}
-            style={textStyle}
           >
             {f[0].toUpperCase() + f.slice(1)} ({counts[f]})
           </button>
         ))}
+
+        <button
+          onClick={() => load(false)}
+          disabled={refreshing}
+          className="ml-auto flex items-center gap-2 px-4 py-2 text-sm bg-white border border-[hsl(214,32%,91%)] rounded-lg hover:bg-[hsl(210,40%,96%)]"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
       {loading ? (
-        <p className="text-sm text-[hsl(215,16%,47%)]">Loading…</p>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[hsl(211,100%,50%)]"></div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-lg border border-[hsl(214,32%,91%)] p-12 text-center">
           <UsersIcon className="w-10 h-10 mx-auto text-[hsl(215,16%,47%)] mb-3" />
-          <p className="text-sm text-[hsl(215,16%,47%)]">No applications.</p>
+          <p className="text-sm text-[hsl(215,16%,47%)]">No applications found.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -202,7 +204,7 @@ export function ApplicationsTab() {
             <div key={a.id} className="bg-white rounded-lg border border-[hsl(214,32%,91%)] p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <p className="text-base font-semibold text-[hsl(222,47%,11%)]">{a.name}</p>
                     <span
                       className={`text-xs px-2.5 py-0.5 rounded-full ${
@@ -228,7 +230,6 @@ export function ApplicationsTab() {
                     </div>
                     <div className="flex items-center gap-2 text-[hsl(222,47%,11%)]">
                       <Music2 className="w-4 h-4" />
-                      <span>{a.tiktok_handle ? `@${a.tiktok_handle}` : "—"}</span>
                       <span className="text-[hsl(215,16%,47%)]">· {fmtNum(a.tiktok_followers)}</span>
                     </div>
                   </div>
@@ -262,7 +263,11 @@ export function ApplicationsTab() {
                 onClick={() => setExpanded((s) => ({ ...s, [a.id]: !s[a.id] }))}
                 className="mt-4 text-xs font-medium text-[hsl(211,100%,50%)] hover:text-[hsl(211,100%,40%)] flex items-center gap-1"
               >
-                {expanded[a.id] ? <><ChevronUp className="w-3.5 h-3.5" /> Hide details</> : <><ChevronDown className="w-3.5 h-3.5" /> View full application</>}
+                {expanded[a.id] ? (
+                  <><ChevronUp className="w-3.5 h-3.5" /> Hide details</>
+                ) : (
+                  <><ChevronDown className="w-3.5 h-3.5" /> View full application</>
+                )}
               </button>
 
               {expanded[a.id] && (
@@ -281,25 +286,31 @@ export function ApplicationsTab() {
         </div>
       )}
 
+      {/* ✅ Approve Modal */}
       {approveDialog && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setApproveDialog(null)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" style={textStyle}>
             <div className="flex items-start justify-between mb-1">
               <h3 className="text-lg font-semibold text-[hsl(222,47%,11%)]">Approve affiliate</h3>
-              <button onClick={() => setApproveDialog(null)} className="text-[hsl(215,16%,47%)] hover:text-[hsl(222,47%,11%)]"><X className="w-4 h-4" /></button>
+              <button onClick={() => setApproveDialog(null)} className="text-[hsl(215,16%,47%)] hover:text-[hsl(222,47%,11%)]">
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <p className="text-sm text-[hsl(215,16%,47%)] mb-5">
               {approveDialog.name} · <span className="text-[hsl(222,47%,11%)]">{approveDialog.email}</span>
             </p>
 
-            <label className="block text-xs font-medium uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1.5">Coupon / Referral code</label>
+            <label className="block text-xs font-medium uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1.5">
+              Coupon / Referral code
+            </label>
             <input
               value={approveCode}
               onChange={(e) => setApproveCode(e.target.value.toUpperCase())}
               placeholder="e.g. JANE10"
               className="w-full px-3 py-2.5 border border-[hsl(214,32%,91%)] rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(211,100%,50%)]"
             />
-            <p className="text-xs text-[hsl(215,16%,47%)] mt-1.5">Customers use this code at checkout. Link:{" "}
+            <p className="text-xs text-[hsl(215,16%,47%)] mt-1.5">
+              Customers use this code at checkout. Link:{" "}
               <a href={`${SITE_URL}/?ref=${approveCode || "CODE"}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[hsl(211,100%,50%)] hover:underline">
                 {SITE_URL}/?ref={approveCode || "CODE"}
               </a>
@@ -307,7 +318,9 @@ export function ApplicationsTab() {
 
             <div className="grid grid-cols-2 gap-3 mt-5">
               <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1.5">Customer discount %</label>
+                <label className="block text-xs font-medium uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1.5">
+                  Customer discount %
+                </label>
                 <input
                   type="number" min={0} max={100}
                   value={approveDiscount}
@@ -316,7 +329,9 @@ export function ApplicationsTab() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1.5">Affiliate commission %</label>
+                <label className="block text-xs font-medium uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1.5">
+                  Affiliate commission %
+                </label>
                 <input
                   type="number" min={0} max={100}
                   value={approveCommission}
@@ -326,17 +341,37 @@ export function ApplicationsTab() {
               </div>
             </div>
 
+            <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800 flex items-start gap-2">
+                <Zap className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>Approving will automatically create the discount code on your Shopify store and send the approval email.</span>
+              </p>
+            </div>
+
             <div className="mt-6 flex items-center justify-end gap-2">
               <button
                 onClick={() => setApproveDialog(null)}
+                disabled={approving}
                 className="px-4 py-2 text-sm font-medium text-[hsl(222,47%,11%)] border border-[hsl(214,32%,91%)] rounded-lg hover:bg-[hsl(210,40%,96%)]"
-              >Cancel</button>
+              >
+                Cancel
+              </button>
               <button
                 onClick={confirmApprove}
-                disabled={busy === approveDialog.id}
+                disabled={approving || busy === approveDialog.id}
                 className="px-4 py-2 text-sm font-medium text-white bg-[hsl(211,100%,50%)] rounded-lg hover:bg-[hsl(211,100%,45%)] disabled:opacity-50 flex items-center gap-2"
               >
-                <Check className="w-4 h-4" /> Approve & send email
+                {approving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Approve & Send Email
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -352,7 +387,9 @@ function DetailRow({ icon, label, value, fullWidth }: { icon: ReactNode; label: 
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[hsl(215,16%,47%)] mb-1">
         {icon}<span>{label}</span>
       </div>
-      <p className="text-[hsl(222,47%,11%)] whitespace-pre-wrap break-words">{value || <span className="text-[hsl(215,16%,47%)]">—</span>}</p>
+      <p className="text-[hsl(222,47%,11%)] whitespace-pre-wrap break-words">
+        {value || <span className="text-[hsl(215,16%,47%)]">—</span>}
+      </p>
     </div>
   );
 }

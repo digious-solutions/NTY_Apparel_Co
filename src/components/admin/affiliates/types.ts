@@ -1,4 +1,5 @@
-export const SITE_URL = "https://ntyapparel.com";
+export const SITE_URL = "https://ntygear.com";
+export const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 export const textStyle: React.CSSProperties = {
   fontFamily: "Inter, sans-serif",
   textTransform: "none",
