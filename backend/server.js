@@ -12,6 +12,7 @@ import emailRoutes from './src/routes/emailRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import webhookRoutes from './src/routes/webhookRoutes.js';
 import affiliateRoutes from './src/routes/affiliateRoutes.js';
+import { startShopifyTokenRefresh } from './src/services/shopifyService.js';
 
 dotenv.config();
 
@@ -224,6 +225,7 @@ app.put('/api/bench-club/applications/:id/status', async (req, res) => {
 // Start Server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  startShopifyTokenRefresh();
 });
 
 export default app;
