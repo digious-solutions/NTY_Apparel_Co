@@ -114,7 +114,7 @@ const Account = () => {
           {/* Title */}
           <header className="mb-10">
             <h1 className="text-4xl sm:text-5xl tracking-tight leading-none" style={{ fontFamily: "'Arial Black', sans-serif" }}>
-              My Account
+              My Account Test
             </h1>
             <p className="text-sm text-muted-foreground mt-2">Welcome back, {fullName}</p>
           </header>
