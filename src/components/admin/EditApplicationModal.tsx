@@ -17,7 +17,7 @@ type Application = {
     created_at: string;
 };
 
-const TIERS = [225, 315, 405];
+const TIERS = [225, 315, 405, 500, 600, 700];
 const LIFTS = ["Bench Press", "Deadlift"];
 
 export function EditApplicationModal({
