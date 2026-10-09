@@ -11,7 +11,7 @@ type Member = {
   member_number: number;
 };
 
-const TIERS = [225, 315, 405];
+const TIERS = [225, 315, 405, 500, 600, 700];
 const LIFTS = ["Bench Press", "Deadlift", "Both"];
 
 export function EditMemberModal({
