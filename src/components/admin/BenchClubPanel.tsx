@@ -392,14 +392,14 @@ export function BenchClubPanel() {
                           >
                             <X className="w-4 h-4" /> Reject
                           </button>
-                          <button
+                          {/* <button
                             onClick={() => setEditingApp(a)}
                             disabled={busy === a.id}
                             className="bg-white text-[hsl(222,47%,11%)] border border-[hsl(214,32%,91%)] text-sm font-medium px-3 py-2 rounded-lg hover:bg-[hsl(210,40%,96%)] disabled:opacity-50 flex items-center gap-2 transition-colors"
                             title="Edit application"
                           >
                             <Edit className="w-4 h-4" />
-                          </button>
+                          </button> */}
                         </div>
                       )}
                     </div>
