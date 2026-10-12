@@ -453,13 +453,13 @@ export function BenchClubPanel() {
                     <p className="text-sm text-[hsl(215,16%,47%)] mt-1">{m.email}</p>
                   </div>
                 </div>
-                <button
+                {/* <button
                   onClick={() => setEditingMember(m)}
                   className="p-2 rounded-lg hover:bg-gray-100"
                   title="Edit member"
                 >
                   <Edit className="w-4 h-4" />
-                </button>
+                </button> */}
               </div>
             ))
           )}
