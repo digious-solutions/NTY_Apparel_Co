@@ -1,0 +1,7 @@
+ALTER TABLE bench_club_applications
+    ADD COLUMN country VARCHAR(100) DEFAULT NULL,
+    ADD COLUMN age_group VARCHAR(10) DEFAULT NULL,
+    ADD COLUMN parent_guardian_email VARCHAR(255) DEFAULT NULL,
+    ADD COLUMN media_permission BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN footage_approved_for_promo BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN consent_timestamp TIMESTAMP NULL DEFAULT NULL;
