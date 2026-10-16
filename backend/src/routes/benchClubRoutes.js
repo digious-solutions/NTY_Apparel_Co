@@ -231,11 +231,12 @@ router.get('/my-applications', authenticateToken, async (req, res) => {
         video_url, 
         additional_notes as notes, 
         status, 
-        created_at 
-      FROM bench_club_applications 
-      WHERE user_id = ? 
+        created_at,
+        updated_at as reviewed_at
+      FROM bench_club_applications
+      WHERE user_id = ? OR LOWER(email) = LOWER(?)
       ORDER BY created_at DESC`,
-      [userId]
+      [userId, req.user.email]
     );
 
     res.json({
@@ -261,17 +262,20 @@ router.get('/my-member', authenticateToken, async (req, res) => {
         id, 
         full_name as name, 
         email, 
+        lift_type,
         weight_tier, 
         member_number, 
-        created_at as approved_at 
+        COALESCE(updated_at, created_at) as approved_at
       FROM bench_club_members 
-      WHERE user_id = ?`,
-      [userId]
+      WHERE user_id = ? OR LOWER(email) = LOWER(?)
+      ORDER BY created_at ASC`,
+      [userId, req.user.email]
     );
 
     res.json({
       success: true,
       data: rows[0] || null,
+      members: rows,
     });
   } catch (error) {
     console.error('Fetch member error:', error);
@@ -344,10 +348,15 @@ router.put('/applications/:id/approve', async (req, res) => {
 
     const app = apps[0];
 
-    // ✅ Check if user already has this tier for SAME lift type
+    // Both memberships grant either lift, so don't create a duplicate lift row.
     const [existingMember] = await connection.execute(
-      'SELECT id, weight_tier, member_number FROM bench_club_members WHERE user_id = ? AND weight_tier = ? AND lift_type = ?',
-      [app.user_id, app.weight_tier, app.lift_type]
+      `SELECT id, weight_tier, member_number
+       FROM bench_club_members
+       WHERE (user_id = ? OR LOWER(email) = LOWER(?))
+         AND weight_tier = ?
+         AND (lift_type = ? OR lift_type = 'Both')
+       LIMIT 1`,
+      [app.user_id, app.email, app.weight_tier, app.lift_type]
     );
 
     if (existingMember.length > 0) {
@@ -366,10 +375,15 @@ router.put('/applications/:id/approve', async (req, res) => {
       });
     }
 
-    // ✅ Check if user exists with DIFFERENT tier for SAME lift type
+    // Upgrade the existing membership for this lift (or a Both membership).
     const [existingUser] = await connection.execute(
-      'SELECT id, user_id, weight_tier, member_number FROM bench_club_members WHERE user_id = ? AND lift_type = ?',
-      [app.user_id, app.lift_type]
+      `SELECT id, user_id, weight_tier, member_number
+       FROM bench_club_members
+       WHERE (user_id = ? OR LOWER(email) = LOWER(?))
+         AND (lift_type = ? OR lift_type = 'Both')
+       ORDER BY CASE WHEN lift_type = ? THEN 0 ELSE 1 END
+       LIMIT 1`,
+      [app.user_id, app.email, app.lift_type, app.lift_type]
     );
 
     if (existingUser.length > 0) {
