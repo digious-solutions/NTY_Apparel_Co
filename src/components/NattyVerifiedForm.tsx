@@ -68,7 +68,11 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const liftOptions = ["Bench Press", "Deadlift"];
-  const weightOptions = ["225", "315", "405", "500", "600", "700"];
+  const weightOptionsByLift: Record<string, string[]> = {
+    "Bench Press": ["225", "315", "405", "500"],
+    Deadlift: ["225", "315", "405", "500", "600", "700"],
+  };
+  const weightOptions = weightOptionsByLift[formData.lift] ?? [];
 
   // ✅ Auto-fill user data when logged in
   useEffect(() => {
@@ -86,6 +90,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     setFormData(prev => ({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      ...(name === "lift" ? { weightTier: "" } : {}),
     }));
   };
 
@@ -518,7 +523,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
                 onChange={handleInputChange}
                 className="w-full border border-[#0003] bg-[#0000001a] text-gray-900 font-body text-sm px-5 py-3.5 focus:outline-none focus:border-[#B8860B] focus:ring-1 focus:ring-[#B8860B]/20 transition-all rounded-lg appearance-none"
                 required
-                disabled={loading}
+                disabled={loading || !formData.lift}
               >
                 <option value="">Select an Option...</option>
                 {weightOptions.map(opt => (

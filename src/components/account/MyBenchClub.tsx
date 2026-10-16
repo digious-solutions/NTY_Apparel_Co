@@ -280,7 +280,6 @@ export function MyBenchClub() {
   const deadliftMember = members
     .filter((candidate) => membershipIncludesLift(candidate.lift_type, "Deadlift"))
     .sort((a, b) => b.weight_tier - a.weight_tier)[0] ?? null;
-  const latestApp = getLatestApplication("Bench Press");
   const approvedBenchApplications = applications.filter((app) => (
     app.status === "approved" && membershipIncludesLift(app.lift_type, "Bench Press")
   ));
@@ -295,6 +294,12 @@ export function MyBenchClub() {
   const currentDeadliftTier = latestApprovedDeadliftApplication?.weight_tier ?? deadliftMember?.weight_tier ?? maxDeadliftTier;
   const isMember = !!benchMember || approvedBenchApplications.length > 0;
   const isDeadliftMember = !!deadliftMember || approvedDeadliftApplications.length > 0;
+  const heroLift = isMember ? "Bench Press" : "Deadlift";
+  const heroMember = isMember ? benchMember : deadliftMember;
+  const heroIsMember = isMember || isDeadliftMember;
+  const heroCurrentTier = isMember ? currentBenchTier : currentDeadliftTier;
+  const heroLatestApplication = getLatestApplication(heroLift);
+  const heroMemberNumber = heroMember?.member_number;
 
   // ===== Helper function to check if tier product is unlocked =====
   const isTierUnlocked = (lbs: number) => {
@@ -311,46 +316,46 @@ export function MyBenchClub() {
       <section
         className="relative overflow-hidden border p-8 rounded-lg"
         style={{
-          background: isMember
+          background: heroIsMember
             ? "linear-gradient(135deg, hsl(0 0% 6%) 0%, hsl(0 0% 12%) 100%)"
             : "linear-gradient(135deg, hsl(45 70% 95%) 0%, hsl(0 0% 100%) 100%)",
-          borderColor: isMember ? "hsl(45 80% 50% / 0.4)" : "hsl(45 70% 80%)",
-          color: isMember ? "hsl(45 80% 90%)" : "inherit",
+          borderColor: heroIsMember ? "hsl(45 80% 50% / 0.4)" : "hsl(45 70% 80%)",
+          color: heroIsMember ? "hsl(45 80% 90%)" : "inherit",
         }}
       >
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase opacity-70 mb-3">
               <Dumbbell className="w-3.5 h-3.5" />
-              Natty Bench Press Club
+              {heroLift === "Bench Press" ? "Natty Bench Press Club" : "Natty Deadlift Club"}
             </div>
             <h3 className="text-3xl sm:text-4xl tracking-tight leading-none" style={{ fontFamily: "'Arial Black', sans-serif" }}>
-              {isMember
-                ? `${currentBenchTier} CLUB`
-                : latestApp?.status === "pending"
+              {heroIsMember
+                ? `${heroCurrentTier} CLUB`
+                : heroLatestApplication?.status === "pending"
                   ? "UNDER REVIEW"
-                  : latestApp?.status === "rejected"
+                  : heroLatestApplication?.status === "rejected"
                     ? "NOT APPROVED"
                     : "NOT A MEMBER"}
             </h3>
             <p className="text-sm mt-2 opacity-80">
-              {isMember
-                ? benchMember
-                  ? `Verified · Member #${String(benchMember.member_number).padStart(4, "0")}`
-                  : "Verified Bench Press member"
-                : latestApp?.status === "pending"
-                  ? `Your ${latestApp.weight_tier}lb application is being reviewed.`
-                  : latestApp?.status === "rejected"
+              {heroIsMember
+                ? heroMemberNumber
+                  ? `Verified · Member #${String(heroMemberNumber).padStart(4, "0")}`
+                  : `Verified ${heroLift} member`
+                : heroLatestApplication?.status === "pending"
+                  ? `Your ${heroLatestApplication.weight_tier}lb application is being reviewed.`
+                  : heroLatestApplication?.status === "rejected"
                     ? "Your last application wasn't approved. You may reapply."
-                    : "Earn your spot by submitting a verified bench press video."}
+                    : `Earn your spot by submitting a verified ${heroLift === "Bench Press" ? "bench press" : "deadlift"} video.`}
             </p>
           </div>
           <div className="text-right">
-            {isMember ? (
+            {heroIsMember ? (
               <CheckCircle2 className="w-12 h-12 opacity-80" style={{ color: "hsl(45 90% 60%)" }} strokeWidth={1.5} />
-            ) : latestApp?.status === "pending" ? (
+            ) : heroLatestApplication?.status === "pending" ? (
               <Clock className="w-12 h-12 opacity-60" strokeWidth={1.5} />
-            ) : latestApp?.status === "rejected" ? (
+            ) : heroLatestApplication?.status === "rejected" ? (
               <AlertCircle className="w-12 h-12 opacity-60 text-red-500" strokeWidth={1.5} />
             ) : (
               <Lock className="w-12 h-12 opacity-40" strokeWidth={1.5} />
@@ -358,12 +363,12 @@ export function MyBenchClub() {
           </div>
         </div>
 
-        {!isMember && (
+        {!heroIsMember && (
           <a
             href="/natty-verification"
             className="inline-flex items-center gap-2 mt-6 bg-foreground text-background px-5 py-2.5 text-xs tracking-[0.2em] uppercase hover:opacity-90 rounded"
           >
-            {latestApp?.status === "rejected" ? "Reapply" : latestApp?.status === "pending" ? "View Application" : "Apply Now"}
+            {heroLatestApplication?.status === "rejected" ? "Reapply" : heroLatestApplication?.status === "pending" ? "View Application" : "Apply Now"}
           </a>
         )}
       </section>
