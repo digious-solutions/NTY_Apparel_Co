@@ -391,14 +391,14 @@ export function DeadLiftPanel() {
                           >
                             <X className="w-4 h-4" /> Reject
                           </button>
-                          {/* <button
+                          <button
                             onClick={() => setEditingApp(a)}
                             disabled={busy === a.id}
                             className="bg-white text-[hsl(222,47%,11%)] border border-[hsl(214,32%,91%)] text-sm font-medium px-3 py-2 rounded-lg hover:bg-[hsl(210,40%,96%)] disabled:opacity-50 flex items-center gap-2 transition-colors"
                             title="Edit application"
                           >
                             <Edit className="w-4 h-4" />
-                          </button> */}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -452,14 +452,13 @@ export function DeadLiftPanel() {
                     <p className="text-sm text-[hsl(215,16%,47%)] mt-1">{m.email}</p>
                   </div>
                 </div>
-
-                {/* <button
+                <button
                   onClick={() => setEditingMember(m)}
                   className="p-2 rounded-lg hover:bg-gray-100"
                   title="Edit member"
                 >
                   <Edit className="w-4 h-4" />
-                </button> */}
+                </button>
               </div>
             ))
           )}

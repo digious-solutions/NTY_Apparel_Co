@@ -2,12 +2,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { 
-  Dumbbell, 
-  ExternalLink, 
-  Lock, 
-  CheckCircle2, 
-  Clock, 
+import {
+  Dumbbell,
+  ExternalLink,
+  Lock,
+  CheckCircle2,
+  Clock,
   Trophy,
   Eye,
   XCircle,
@@ -22,31 +22,52 @@ const TIERS = [
   { lbs: 225, name: "225 Club", desc: "The foundation. Two plates a side." },
   { lbs: 315, name: "315 Club", desc: "Three plates. Elite natural pressing." },
   { lbs: 405, name: "405 Club", desc: "Four plates. Rarefied air." },
+  { lbs: 500, name: "500 Club", desc: "Five plates. Rarefied air." },
+  { lbs: 600, name: "600 Club", desc: "Six plates. Rarefied air." },
+  { lbs: 700, name: "700 Club", desc: "Seven plates. Rarefied air." },
+];
+
+const DEADLIFT_TIERS = [
+  { lbs: 225, name: "225 Club", desc: "Two plates off the floor." },
+  { lbs: 315, name: "315 Club", desc: "Three plates pulled." },
+  { lbs: 405, name: "405 Club", desc: "Four plates pulled." },
+  { lbs: 500, name: "500 Club", desc: "A major deadlift milestone." },
+  { lbs: 600, name: "600 Club", desc: "Elite pulling strength." },
+  { lbs: 700, name: "700 Club", desc: "Exceptional deadlift strength." },
 ];
 
 // ===== TIER PRODUCTS CONFIGURATION =====
-const TIER_PRODUCTS = [ 
-  { 
-    lbs: 225, 
+const TIER_PRODUCTS = [
+  {
+    lbs: 225,
     name: "225 lbs club",
     handle: "merch-mockups-for-225lbs-club", // Placeholder 
     image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/64A5B611-B159-4FDF-BA83-FCFB73E2EB5F.png?v=1787179212", // Placeholder
     price: "$55.00"
   },
   {
-    lbs: 315, 
+    lbs: 315,
     name: "315 lbs club",
     handle: "315lbs-club", // Placeholder
     image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/B74049B8-1401-4C27-8834-6FF2BAE0D21B.png?v=1787179537", // Placeholder
     price: "$55.00"
   },
-  { 
-    lbs: 405, 
+  {
+    lbs: 405,
     name: "405 lbs club",
     handle: "405lbs-club", // Placeholder
     image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/7A6D3BC6-6291-45E2-AF8B-2A90FBF0E1D9.png?v=1787179897", // Placeholder
     price: "$55.00"
   }
+];
+
+const DEADLIFT_TIER_PRODUCTS = [
+  { lbs: 225, name: "Deadlift 225 Club", handle: "225-lbs-deadlift", image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/225lbsDeadlift.jpg?v=1792104074", price: "$55.00" },
+  { lbs: 315, name: "Deadlift 315 Club", handle: "315-lbs-deadlift", image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/315lbsDeadlift.png?v=1792104156", price: "$55.00" },
+  { lbs: 405, name: "Deadlift 405 Club", handle: "405-lbs-deadlift", image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/405lbsDeadlift.png?v=1792103582", price: "$55.00" },
+  { lbs: 500, name: "Deadlift 500 Club", handle: "500-lbs-deadlift", image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/500lbsDeadlift.png?v=1792103731", price: "$55.00" },
+  { lbs: 600, name: "Deadlift 600 Club", handle: "600-lbs-deadlift", image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/600lbsDeadlift.png?v=1792103816", price: "$55.00" },
+  { lbs: 700, name: "Deadlift 700 Club", handle: "700-lbs-deadlift", image: "https://cdn.shopify.com/s/files/1/0627/6933/2295/files/700lbsdeadlift.jpg?v=1792104226", price: "$55.00" },
 ];
 
 type Application = {
@@ -60,23 +81,110 @@ type Application = {
   notes: string | null;
   status: "pending" | "approved" | "rejected";
   created_at: string;
+  reviewed_at?: string | null;
 };
 
 type Member = {
   id: number;
   name: string;
   email: string;
+  lift_type?: string | null;
   weight_tier: number;
   member_number: number;
   approved_at: string;
 };
 
+const membershipIncludesLift = (liftType: string | null | undefined, lift: "Bench Press" | "Deadlift") => {
+  const normalizedLiftType = liftType?.trim().toLowerCase();
+  return normalizedLiftType === lift.toLowerCase() || normalizedLiftType === "both";
+};
+
+const getLatestApprovedApplication = (
+  applications: Application[],
+  lift: "Bench Press" | "Deadlift",
+) => applications
+  .filter((application) => (
+    application.status === "approved" && membershipIncludesLift(application.lift_type, lift)
+  ))
+  .sort((a, b) => (
+    new Date(b.reviewed_at || b.created_at).getTime() -
+    new Date(a.reviewed_at || a.created_at).getTime()
+  ))[0] ?? null;
+
+function TierLadder({
+  title,
+  tiers,
+  isMember,
+  currentTier,
+  maxTier,
+}: {
+  title: string;
+  tiers: typeof TIERS;
+  isMember: boolean;
+  currentTier: number;
+  maxTier: number;
+}) {
+  return (
+    <section className="border border-foreground/10 bg-card p-6 rounded-lg">
+      <div className="flex items-center gap-2 mb-5">
+        <Trophy className="w-4 h-4" />
+        <h4 className="text-sm tracking-[0.2em] uppercase">{title}</h4>
+        {isMember && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            Current: {currentTier} lbs
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {tiers.map((tier) => {
+          const isUnlocked = isMember && maxTier >= tier.lbs;
+          const isCurrent = isMember && currentTier === tier.lbs;
+
+          return (
+            <div
+              key={tier.lbs}
+              className={`border p-4 rounded-lg transition-all ${isCurrent
+                ? "border-[#141414] bg-[#141414] text-white shadow-lg"
+                : isUnlocked
+                  ? "border-green-500 bg-green-50 text-gray-900"
+                  : "border-gray-200 bg-gray-50 opacity-60"
+                }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-2xl tracking-tight" style={{ fontFamily: "'Arial Black', sans-serif" }}>
+                  {tier.lbs}
+                </span>
+                {isUnlocked ? (
+                  <CheckCircle2 className={`w-4 h-4 ${isCurrent ? "text-white" : "text-green-600"}`} strokeWidth={2} />
+                ) : (
+                  <Lock className="w-4 h-4 text-gray-400" strokeWidth={1.5} />
+                )}
+              </div>
+              <p className="text-[10px] tracking-[0.2em] uppercase opacity-70">{tier.name}</p>
+              <p className="text-xs mt-2 opacity-70 leading-snug">{tier.desc}</p>
+              {isUnlocked && !isCurrent && (
+                <span className="inline-block mt-2 text-[10px] font-medium text-green-600">
+                  ✓ Unlocked
+                </span>
+              )}
+              {isCurrent && (
+                <span className="inline-block mt-2 text-[10px] font-medium text-white/80">
+                  ★ Current
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function MyBenchClub() {
   const { user, token } = useAuth();
-  const [member, setMember] = useState<Member | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
-  const [approvedTiers, setApprovedTiers] = useState<number[]>([]);
 
   useEffect(() => {
     if (user && token) {
@@ -96,12 +204,16 @@ export function MyBenchClub() {
         },
       });
 
-      if (memberRes.ok) {
-        const memberData = await memberRes.json();
-        if (memberData.success && memberData.data) {
-          setMember(memberData.data);
-        }
+      if (!memberRes.ok) {
+        throw new Error(`Failed to load memberships (${memberRes.status}).`);
       }
+      const memberData = await memberRes.json();
+      if (!memberData.success) {
+        throw new Error(memberData.error || "Failed to load memberships.");
+      }
+      const memberRows = memberData.members ?? memberData.data;
+      const memberList = Array.isArray(memberRows) ? memberRows : memberRows ? [memberRows] : [];
+      setMembers(memberList);
 
       // ✅ Fetch user's applications
       const appsRes = await fetch(`${API_URL}/api/bench-club/my-applications`, {
@@ -110,30 +222,25 @@ export function MyBenchClub() {
         },
       });
 
-      if (appsRes.ok) {
-        const appsData = await appsRes.json();
-        if (appsData.success) {
-          setApplications(appsData.data || []);
-          
-          // ✅ Calculate approved tiers
-          const approved = appsData.data
-            .filter((app: Application) => app.status === "approved")
-            .map((app: Application) => app.weight_tier);
-          setApprovedTiers(approved);
-        }
+      if (!appsRes.ok) {
+        throw new Error(`Failed to load applications (${appsRes.status}).`);
       }
+      const appsData = await appsRes.json();
+      if (!appsData.success) {
+        throw new Error(appsData.error || "Failed to load applications.");
+      }
+      setApplications(appsData.data || []);
 
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Failed to load your Bench Club data");
+      toast.error(error instanceof Error ? error.message : "Failed to load your Bench Club data");
     } finally {
       setLoading(false);
     }
   };
 
-  const getLatestApplication = () => {
-    if (applications.length === 0) return null;
-    return applications[0];
+  const getLatestApplication = (lift: "Bench Press" | "Deadlift") => {
+    return applications.find((application) => membershipIncludesLift(application.lift_type, lift)) ?? null;
   };
 
   const getStatusBadge = (status: string) => {
@@ -167,13 +274,35 @@ export function MyBenchClub() {
     );
   }
 
-  const latestApp = getLatestApplication();
-  const currentTier = member?.weight_tier ?? 0;
-  const isMember = !!member;
+  const benchMember = members
+    .filter((candidate) => membershipIncludesLift(candidate.lift_type, "Bench Press"))
+    .sort((a, b) => b.weight_tier - a.weight_tier)[0] ?? null;
+  const deadliftMember = members
+    .filter((candidate) => membershipIncludesLift(candidate.lift_type, "Deadlift"))
+    .sort((a, b) => b.weight_tier - a.weight_tier)[0] ?? null;
+  const latestApp = getLatestApplication("Bench Press");
+  const approvedBenchApplications = applications.filter((app) => (
+    app.status === "approved" && membershipIncludesLift(app.lift_type, "Bench Press")
+  ));
+  const approvedDeadliftApplications = applications.filter((app) => (
+    app.status === "approved" && membershipIncludesLift(app.lift_type, "Deadlift")
+  ));
+  const latestApprovedBenchApplication = getLatestApprovedApplication(applications, "Bench Press");
+  const latestApprovedDeadliftApplication = getLatestApprovedApplication(applications, "Deadlift");
+  const maxBenchTier = Math.max(benchMember?.weight_tier ?? 0, ...approvedBenchApplications.map((app) => app.weight_tier));
+  const maxDeadliftTier = Math.max(deadliftMember?.weight_tier ?? 0, ...approvedDeadliftApplications.map((app) => app.weight_tier));
+  const currentBenchTier = latestApprovedBenchApplication?.weight_tier ?? benchMember?.weight_tier ?? maxBenchTier;
+  const currentDeadliftTier = latestApprovedDeadliftApplication?.weight_tier ?? deadliftMember?.weight_tier ?? maxDeadliftTier;
+  const isMember = !!benchMember || approvedBenchApplications.length > 0;
+  const isDeadliftMember = !!deadliftMember || approvedDeadliftApplications.length > 0;
 
   // ===== Helper function to check if tier product is unlocked =====
   const isTierUnlocked = (lbs: number) => {
-    return approvedTiers.includes(lbs) || (isMember && currentTier >= lbs);
+    return isMember && maxBenchTier >= lbs;
+  };
+
+  const isDeadliftTierUnlocked = (lbs: number) => {
+    return isDeadliftMember && maxDeadliftTier >= lbs;
   };
 
   return (
@@ -196,22 +325,24 @@ export function MyBenchClub() {
               Natty Bench Press Club
             </div>
             <h3 className="text-3xl sm:text-4xl tracking-tight leading-none" style={{ fontFamily: "'Arial Black', sans-serif" }}>
-              {isMember 
-                ? `${member.weight_tier} CLUB` 
-                : latestApp?.status === "pending" 
-                  ? "UNDER REVIEW" 
+              {isMember
+                ? `${currentBenchTier} CLUB`
+                : latestApp?.status === "pending"
+                  ? "UNDER REVIEW"
                   : latestApp?.status === "rejected"
-                  ? "NOT APPROVED"
-                  : "NOT A MEMBER"}
+                    ? "NOT APPROVED"
+                    : "NOT A MEMBER"}
             </h3>
             <p className="text-sm mt-2 opacity-80">
               {isMember
-                ? `Verified · Member #${String(member.member_number).padStart(4, "0")}`
+                ? benchMember
+                  ? `Verified · Member #${String(benchMember.member_number).padStart(4, "0")}`
+                  : "Verified Bench Press member"
                 : latestApp?.status === "pending"
-                ? `Your ${latestApp.weight_tier}lb application is being reviewed.`
-                : latestApp?.status === "rejected"
-                ? "Your last application wasn't approved. You may reapply."
-                : "Earn your spot by submitting a verified bench press video."}
+                  ? `Your ${latestApp.weight_tier}lb application is being reviewed.`
+                  : latestApp?.status === "rejected"
+                    ? "Your last application wasn't approved. You may reapply."
+                    : "Earn your spot by submitting a verified bench press video."}
             </p>
           </div>
           <div className="text-right">
@@ -319,64 +450,13 @@ export function MyBenchClub() {
         </div>
       </section>
 
-      {/* Tier Ladder - Dynamic Unlock */}
-      <section className="border border-foreground/10 bg-card p-6 rounded-lg">
-        <div className="flex items-center gap-2 mb-5">
-          <Trophy className="w-4 h-4" />
-          <h4 className="text-sm tracking-[0.2em] uppercase">Tier Ladder</h4>
-          {isMember && (
-            <span className="text-xs text-muted-foreground ml-auto">
-              Current: {currentTier} lbs
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {TIERS.map((t) => {
-            // ✅ Check if tier is unlocked (approved)
-            const isUnlocked = approvedTiers.includes(t.lbs);
-            // ✅ Check if tier is current member tier
-            const isCurrent = isMember && currentTier === t.lbs;
-            // ✅ Check if tier is lower than current (can be unlocked)
-            const isEarned = isMember && currentTier >= t.lbs;
-            
-            return (
-              <div
-                key={t.lbs}
-                className={`border p-4 rounded-lg transition-all ${
-                  isCurrent
-                    ? "border-[#141414] bg-[#141414] text-white shadow-lg"
-                    : isUnlocked || isEarned
-                    ? "border-green-500 bg-green-50 text-gray-900"
-                    : "border-gray-200 bg-gray-50 opacity-60"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl tracking-tight" style={{ fontFamily: "'Arial Black', sans-serif" }}>
-                    {t.lbs}
-                  </span>
-                  {isUnlocked || isEarned ? (
-                    <CheckCircle2 className={`w-4 h-4 ${isCurrent ? 'text-white' : 'text-green-600'}`} strokeWidth={2} />
-                  ) : (
-                    <Lock className="w-4 h-4 text-gray-400" strokeWidth={1.5} />
-                  )}
-                </div>
-                <p className="text-[10px] tracking-[0.2em] uppercase opacity-70">{t.name}</p>
-                <p className="text-xs mt-2 opacity-70 leading-snug">{t.desc}</p>
-                {isUnlocked && !isCurrent && (
-                  <span className="inline-block mt-2 text-[10px] font-medium text-green-600">
-                    ✓ Unlocked
-                  </span>
-                )}
-                {isCurrent && (
-                  <span className="inline-block mt-2 text-[10px] font-medium text-white/80">
-                    ★ Current
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <TierLadder
+        title="Bench Club Tier Ladder"
+        tiers={TIERS}
+        isMember={isMember}
+        currentTier={currentBenchTier}
+        maxTier={maxBenchTier}
+      />
 
       {/* ============================================================
           NEW: TIER PRODUCTS SECTION - UNLOCKS WITH TIER PROGRESS
@@ -384,10 +464,10 @@ export function MyBenchClub() {
       <section className="border border-foreground/10 bg-card p-6 rounded-lg">
         <div className="flex items-center gap-2 mb-5">
           <ShoppingBag className="w-4 h-4" />
-          <h4 className="text-sm tracking-[0.2em] uppercase">Tier Products</h4>
+          <h4 className="text-sm tracking-[0.2em] uppercase">Bench Club Tier Products</h4>
           {isMember && (
             <span className="text-xs text-muted-foreground ml-auto">
-              {approvedTiers.length} / {TIER_PRODUCTS.length} unlocked
+              {TIER_PRODUCTS.filter((product) => isTierUnlocked(product.lbs)).length} / {TIER_PRODUCTS.length} unlocked
             </span>
           )}
         </div>
@@ -404,15 +484,14 @@ export function MyBenchClub() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {TIER_PRODUCTS.map((product) => {
               const isUnlocked = isTierUnlocked(product.lbs);
-              
+
               return (
                 <div
                   key={product.lbs}
-                  className={`group relative border rounded-lg overflow-hidden transition-all ${
-                    isUnlocked 
-                      ? "border-[#B8860B]/30 hover:border-[#B8860B] hover:shadow-lg hover:shadow-[#B8860B]/10" 
-                      : "border-gray-200 opacity-60"
-                  }`}
+                  className={`group relative border rounded-lg overflow-hidden transition-all ${isUnlocked
+                    ? "border-[#B8860B]/30 hover:border-[#B8860B] hover:shadow-lg hover:shadow-[#B8860B]/10"
+                    : "border-gray-200 opacity-60"
+                    }`}
                 >
                   {/* Product Image */}
                   <div className="aspect-square bg-gray-100 relative overflow-hidden">
@@ -448,6 +527,103 @@ export function MyBenchClub() {
                     </div>
 
                     {/* Action Button */}
+                    {isUnlocked ? (
+                      <a
+                        href={`https://ntygear.com/products/${product.handle}`}
+                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-[#141414] text-white px-4 py-2 text-xs tracking-[0.2em] uppercase hover:bg-[#2a2a2a] transition rounded"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        Shop Now
+                      </a>
+                    ) : (
+                      <button
+                        disabled
+                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-gray-200 text-gray-500 px-4 py-2 text-xs tracking-[0.2em] uppercase rounded cursor-not-allowed"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        Locked
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {isDeadliftMember && (
+        <TierLadder
+          title="Deadlift Tier Ladder"
+          tiers={DEADLIFT_TIERS}
+          isMember={isDeadliftMember}
+          currentTier={currentDeadliftTier}
+          maxTier={maxDeadliftTier}
+        />
+      )}
+
+      {/* Deadlift products unlock only for Deadlift or Both members, by their verified tier. */}
+      <section className="border border-foreground/10 bg-card p-6 rounded-lg">
+        <div className="flex items-center gap-2 mb-5">
+          <ShoppingBag className="w-4 h-4" />
+          <h4 className="text-sm tracking-[0.2em] uppercase">Deadlift Tier Products</h4>
+          {isDeadliftMember && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              {DEADLIFT_TIER_PRODUCTS.filter((product) => isDeadliftTierUnlocked(product.lbs)).length} / {DEADLIFT_TIER_PRODUCTS.length} unlocked
+            </span>
+          )}
+        </div>
+
+        {!isDeadliftMember && (
+          <div className="text-center py-5 mb-5 border border-dashed border-foreground/15 rounded-lg">
+            <Lock className="w-10 h-10 mx-auto text-gray-300 mb-3" strokeWidth={1.5} />
+            <p className="text-sm text-muted-foreground">Deadlift products are for verified Deadlift Club members.</p>
+            <a href="/natty-verification" className="inline-block mt-3 text-[#B8860B] hover:underline text-sm font-medium">
+              Apply Now →
+            </a>
+          </div>
+        )}
+        {isDeadliftMember && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {DEADLIFT_TIER_PRODUCTS.map((product) => {
+              const isUnlocked = isDeadliftTierUnlocked(product.lbs);
+
+              return (
+                <div
+                  key={product.lbs}
+                  className={`group relative border rounded-lg overflow-hidden transition-all ${isUnlocked
+                    ? "border-[#B8860B]/30 hover:border-[#B8860B] hover:shadow-lg hover:shadow-[#B8860B]/10"
+                    : "border-gray-200 opacity-70"
+                    }`}
+                >
+                  <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    {isUnlocked ? (
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-medium px-2 py-1 rounded">
+                        ✓ Unlocked
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                        {/* <Lock className="w-8 h-8 text-white" strokeWidth={1.5} /> */}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[13px] font-semibold tracking-[0.2em] uppercase text-muted-foreground">
+                          {product.lbs} lbs Club
+                        </p>
+                        {/* <h5 className="font-semibold text-sm mt-1">{product.name}</h5> */}
+                      </div>
+                      <span className="font-bold text-[#B8860B]">{product.price}</span>
+                    </div>
+
                     {isUnlocked ? (
                       <a
                         href={`https://ntygear.com/products/${product.handle}`}
