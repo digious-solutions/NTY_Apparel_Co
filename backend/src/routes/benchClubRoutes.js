@@ -118,6 +118,12 @@ router.post('/apply', authenticateToken, async (req, res) => {
       weightTier,
       videoUrl,
       additionalNotes,
+      country,
+      ageGroup,
+      parentGuardianEmail,
+      mediaPermission,
+      footageApprovedForPromo,
+      consentTimestamp,
     } = req.body;
 
     if (!user_id || !fullName || !email || !socialHandle || !lift || !weightTier || !videoUrl) {
@@ -125,6 +131,14 @@ router.post('/apply', authenticateToken, async (req, res) => {
         success: false,
         error: 'All required fields must be filled.',
         required: ['user_id', 'fullName', 'email', 'socialHandle', 'lift', 'weightTier', 'videoUrl'],
+      });
+    }
+
+    const parsedConsentTimestamp = consentTimestamp ? new Date(consentTimestamp) : null;
+    if (parsedConsentTimestamp && Number.isNaN(parsedConsentTimestamp.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid consent timestamp.',
       });
     }
 
@@ -144,8 +158,8 @@ router.post('/apply', authenticateToken, async (req, res) => {
 
     const [result] = await pool.execute(
       `INSERT INTO bench_club_applications 
-       (user_id, full_name, email, instagram_handle, phone_number, lift_type, weight_tier, video_url, additional_notes, status, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+       (user_id, full_name, email, instagram_handle, phone_number, lift_type, weight_tier, video_url, additional_notes, country, age_group, parent_guardian_email, media_permission, footage_approved_for_promo, consent_timestamp, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         user_id,
         fullName.trim().substring(0, 100),
@@ -156,6 +170,12 @@ router.post('/apply', authenticateToken, async (req, res) => {
         parseInt(weightTier, 10) || 0,
         videoUrl.trim().substring(0, 500),
         additionalNotes ? additionalNotes.trim().substring(0, 500) : null,
+        country ? country.trim().substring(0, 100) : null,
+        ageGroup || null,
+        parentGuardianEmail ? parentGuardianEmail.trim().toLowerCase().substring(0, 255) : null,
+        mediaPermission === true,
+        footageApprovedForPromo === true,
+        parsedConsentTimestamp,
         'pending',
       ]
     );

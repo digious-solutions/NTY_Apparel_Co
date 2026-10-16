@@ -12,6 +12,35 @@ interface BenchClubFormProps {
 
 const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 
+// ✅ ADDITION 1 — Country list (US first, rest alphabetical)
+const COUNTRIES = [
+  "United States",
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+  "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
+  "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo (Congo-Brazzaville)", "Congo (DRC)", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia",
+  "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+  "Fiji", "Finland", "France",
+  "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
+  "Haiti", "Honduras", "Hungary",
+  "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy",
+  "Jamaica", "Japan", "Jordan",
+  "Kazakhstan", "Kenya", "Kiribati", "Kosovo", "Kuwait", "Kyrgyzstan",
+  "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+  "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+  "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway",
+  "Oman",
+  "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
+  "Qatar",
+  "Romania", "Russia", "Rwanda",
+  "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+  "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
+  "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "Uruguay", "Uzbekistan",
+  "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
+  "Yemen",
+  "Zambia", "Zimbabwe",
+];
+
 const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +55,11 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     additionalNotes: "",
     videoFile: null as File | null,
     confirmVideo: false,
+    // ✅ ADDITION — new fields
+    country: "",
+    ageGroup: "" as "" | "18+" | "13-17" | "under-13",
+    parentGuardianEmail: "",
+    mediaPermission: false,
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -137,6 +171,24 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
       return;
     }
 
+    // ✅ ADDITION — validate country + age
+    if (!formData.country) {
+      toast.error("Please select your country.");
+      return;
+    }
+    if (!formData.ageGroup) {
+      toast.error("Please confirm your age.");
+      return;
+    }
+    if (formData.ageGroup === "under-13") {
+      toast.error("You must be at least 13 to join Natty Verified.");
+      return;
+    }
+    if (formData.ageGroup === "13-17" && !formData.parentGuardianEmail.trim()) {
+      toast.error("Parent/guardian email is required for members under 18.");
+      return;
+    }
+
     setLoading(true);
     setUploadProgress(0);
     setStep("uploading");
@@ -179,6 +231,13 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
           weightTier: parseInt(weightTier, 10),
           videoUrl,
           additionalNotes: formData.additionalNotes || null,
+          // ✅ ADDITION — new fields sent to backend
+          country: formData.country,
+          ageGroup: formData.ageGroup,
+          parentGuardianEmail: formData.ageGroup === "13-17" ? formData.parentGuardianEmail.trim().toLowerCase() : null,
+          mediaPermission: formData.mediaPermission,
+          footageApprovedForPromo: formData.ageGroup === "18+" && formData.mediaPermission,
+          consentTimestamp: new Date().toISOString(),
         }),
       });
 
@@ -292,6 +351,9 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     }
   };
 
+  const isUnder13 = formData.ageGroup === "under-13";
+  const isTeen = formData.ageGroup === "13-17";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -404,6 +466,26 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
             </p>
           </div>
 
+          {/* ✅ ADDITION 1 — Country */}
+          <div>
+            <label className="font-body text-[11px] font-medium text-[#0009] tracking-[2.2px] block mb-1.5">
+              COUNTRY <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="country"
+              value={formData.country}
+              onChange={handleInputChange}
+              className="w-full border border-[#0003] bg-[#0000001a] text-gray-900 font-body text-sm px-5 py-3.5 focus:outline-none focus:border-[#B8860B] focus:ring-1 focus:ring-[#B8860B]/20 transition-all rounded-lg appearance-none"
+              required
+              disabled={loading}
+            >
+              <option value="">Select a Country...</option>
+              {COUNTRIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Lift */}
             <div>
@@ -444,6 +526,82 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* ✅ ADDITION 3 — Age Verification */}
+          <div>
+            <label className="font-body text-[11px] font-medium text-[#0009] tracking-[2.2px] block mb-1.5">
+              AGE VERIFICATION <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-3">
+              {[
+                { value: "18+", label: "18 or older" },
+                { value: "13-17", label: "13 – 17" },
+                { value: "under-13", label: "Under 13" },
+              ].map(opt => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-3 p-3.5 border rounded-lg cursor-pointer transition-all ${
+                    formData.ageGroup === opt.value
+                      ? "border-[#B8860B] bg-[#B8860B]/5"
+                      : "border-[#0003] bg-[#0000001a] hover:border-[#B8860B]/50"
+                  } ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="ageGroup"
+                    value={opt.value}
+                    checked={formData.ageGroup === opt.value}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 accent-[#B8860B] cursor-pointer shrink-0"
+                    required
+                    disabled={loading}
+                  />
+                  <span className="font-body text-sm text-gray-900">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {isUnder13 && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg"
+              >
+                <p className="font-body text-sm text-amber-900 leading-relaxed">
+                  Not quite old enough yet! 💪 We love seeing young lifters putting in the work,
+                  but you must be at least 13 to join Natty Verified. Keep training, and we can't
+                  wait to welcome you on your 13th birthday!
+                </p>
+              </motion.div>
+            )}
+
+            {isTeen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4"
+              >
+                <label className="font-body text-[11px] font-medium text-[#0009] tracking-[2.2px] block mb-1.5">
+                  PARENT/GUARDIAN EMAIL ADDRESS <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="parentGuardianEmail"
+                  placeholder="parent@example.com"
+                  value={formData.parentGuardianEmail}
+                  onChange={handleInputChange}
+                  className="w-full border border-[#0003] bg-[#0000001a] text-gray-900 placeholder:text-gray-400 font-body text-sm px-5 py-3.5 focus:outline-none focus:border-[#B8860B] focus:ring-1 focus:ring-[#B8860B]/20 transition-all rounded-lg"
+                  required
+                  disabled={loading}
+                />
+                <p className="font-body text-xs text-gray-600 mt-2 leading-relaxed">
+                  Members under 18 need parent or guardian permission to be featured on our website
+                  or social media. Please provide a parent or guardian's email address so we can
+                  request authorization. They can still join the club without permission to be featured.
+                </p>
+              </motion.div>
+            )}
           </div>
 
           {/* Video Upload */}
@@ -505,6 +663,22 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
             )}
           </div>
 
+          {/* ✅ ADDITION 2 — Permission to Feature (Optional) */}
+          <div className="flex items-start gap-3 pt-1">
+            <input
+              type="checkbox"
+              name="mediaPermission"
+              checked={formData.mediaPermission}
+              onChange={handleInputChange}
+              className="mt-1 w-4 h-4 accent-[#B8860B] cursor-pointer shrink-0"
+              disabled={loading || isUnder13}
+            />
+            <label className="font-body text-sm text-gray-600 leading-relaxed">
+              I give Natty Apparel permission to use my submitted lifting videos, photos, and name on its website, social media, and promotional content.
+              <span className="block text-xs text-gray-400 mt-1">Optional — unchecked by default.</span>
+            </label>
+          </div>
+
           {/* Confirmation Checkbox */}
           <div className="flex items-start gap-3 pt-1">
             <input
@@ -541,7 +715,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isUnder13}
               className="group w-full relative bg-black text-white font-body text-sm tracking-[0.15em] uppercase px-8 py-4 overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed rounded-lg"
             >
               <span className="absolute inset-0 bg-[#B8860B] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
@@ -551,6 +725,8 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
                     <Loader2 className="w-4 h-4 animate-spin" />
                     {getButtonText()}
                   </>
+                ) : isUnder13 ? (
+                  <>Registration Unavailable</>
                 ) : (
                   <>
                     Submit Application
