@@ -26,6 +26,22 @@ afterEach(() => {
 });
 
 describe("MyBenchClub Deadlift products", () => {
+  it("shows Deadlift membership in the account status card without a Bench apply button", async () => {
+    mockApiResponses([
+      { id: 2, name: "Test User", email: "test@example.com", lift_type: "Deadlift", weight_tier: 315, member_number: 2 },
+    ]);
+    render(<MyBenchClub />);
+
+    const clubLabel = await screen.findByText("Natty Deadlift Club");
+    const statusCard = clubLabel.closest("section");
+    if (!statusCard) throw new Error("Membership status card was not rendered.");
+
+    expect(within(statusCard).getByText("315 CLUB")).toBeInTheDocument();
+    expect(within(statusCard).getByText("Verified · Member #0002")).toBeInTheDocument();
+    expect(within(statusCard).queryByText("NOT A MEMBER")).not.toBeInTheDocument();
+    expect(within(statusCard).queryByRole("link", { name: "Apply Now" })).not.toBeInTheDocument();
+  });
+
   it("hides products until a Deadlift membership is approved", async () => {
     mockApiResponses([]);
     render(<MyBenchClub />);
@@ -80,7 +96,7 @@ describe("MyBenchClub Deadlift products", () => {
     expect(within(deadliftSection).getByText("2 / 6 unlocked")).toBeInTheDocument();
     expect(within(deadliftSection).getAllByRole("link", { name: "Shop Now" })).toHaveLength(2);
 
-    const benchHeading = screen.getByRole("heading", { name: "Tier Products" });
+    const benchHeading = screen.getByRole("heading", { name: "Bench Club Tier Products" });
     const benchSection = benchHeading.closest("section");
     if (!benchSection) throw new Error("Bench products section was not rendered.");
 
