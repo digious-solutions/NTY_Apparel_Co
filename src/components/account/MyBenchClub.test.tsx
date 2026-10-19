@@ -42,6 +42,30 @@ describe("MyBenchClub Deadlift products", () => {
     expect(within(statusCard).queryByRole("link", { name: "Apply Now" })).not.toBeInTheDocument();
   });
 
+  it("shows application age, country, media permission, and consent confirmation", async () => {
+    mockApiResponses([], [{
+      id: 12,
+      name: "Test User",
+      email: "test@example.com",
+      lift_type: "Deadlift",
+      weight_tier: 315,
+      video_url: "",
+      notes: null,
+      country: "United States",
+      age_group: "18+",
+      media_permission: true,
+      footage_approved_for_promo: true,
+      consent_timestamp: "2026-10-16T12:00:00.000Z",
+      status: "pending",
+      created_at: "2026-10-16T12:00:00.000Z",
+    }]);
+    render(<MyBenchClub />);
+
+    expect(await screen.findByText("Country: United States · Age: 18+")).toBeInTheDocument();
+    expect(screen.getByText("Media permission: Granted")).toBeInTheDocument();
+    expect(screen.getByText(/Application consent: Confirmed/)).toBeInTheDocument();
+  });
+
   it("hides products until a Deadlift membership is approved", async () => {
     mockApiResponses([]);
     render(<MyBenchClub />);

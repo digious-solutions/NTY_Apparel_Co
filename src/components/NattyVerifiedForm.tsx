@@ -60,6 +60,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     ageGroup: "" as "" | "18+" | "13-17" | "under-13",
     parentGuardianEmail: "",
     mediaPermission: false,
+    consentConfirmed: false,
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -193,6 +194,10 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
       toast.error("Parent/guardian email is required for members under 18.");
       return;
     }
+    if (!formData.consentConfirmed) {
+      toast.error("Please confirm your application consent.");
+      return;
+    }
 
     setLoading(true);
     setUploadProgress(0);
@@ -242,7 +247,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
           parentGuardianEmail: formData.ageGroup === "13-17" ? formData.parentGuardianEmail.trim().toLowerCase() : null,
           mediaPermission: formData.mediaPermission,
           footageApprovedForPromo: formData.ageGroup === "18+" && formData.mediaPermission,
-          consentTimestamp: new Date().toISOString(),
+          consentConfirmed: formData.consentConfirmed,
         }),
       });
 
@@ -343,7 +348,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
   // ✅ Get button text based on step
   const getButtonText = () => {
     if (!loading) return "Submit Application";
-    
+
     switch (step) {
       case "uploading":
         return `Uploading... ${uploadProgress}%`;
@@ -546,11 +551,10 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
               ].map(opt => (
                 <label
                   key={opt.value}
-                  className={`flex items-center gap-3 p-3.5 border rounded-lg cursor-pointer transition-all ${
-                    formData.ageGroup === opt.value
+                  className={`flex items-center gap-3 p-3.5 border rounded-lg cursor-pointer transition-all ${formData.ageGroup === opt.value
                       ? "border-[#B8860B] bg-[#B8860B]/5"
                       : "border-[#0003] bg-[#0000001a] hover:border-[#B8860B]/50"
-                  } ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
+                    } ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <input
                     type="radio"
@@ -697,6 +701,21 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
             />
             <label className="font-body text-sm text-gray-600 leading-relaxed">
               I confirm that this video is unedited and meets all the verification standards. I understand that any false or misleading submissions will result in disqualification.
+            </label>
+          </div>
+
+          <div className="flex items-start gap-3 pt-1">
+            <input
+              type="checkbox"
+              name="consentConfirmed"
+              checked={formData.consentConfirmed}
+              onChange={handleInputChange}
+              className="mt-1 w-4 h-4 accent-[#B8860B] cursor-pointer shrink-0"
+              required
+              disabled={loading}
+            />
+            <label className="font-body text-sm text-gray-600 leading-relaxed">
+              I confirm that the information in this application is accurate and consent to NTY Apparel reviewing my submitted video and details for club verification.
             </label>
           </div>
 

@@ -122,8 +122,7 @@ router.post('/apply', authenticateToken, async (req, res) => {
       ageGroup,
       parentGuardianEmail,
       mediaPermission,
-      footageApprovedForPromo,
-      consentTimestamp,
+      consentConfirmed,
     } = req.body;
 
     if (!user_id || !fullName || !email || !socialHandle || !lift || !weightTier || !videoUrl) {
@@ -134,11 +133,41 @@ router.post('/apply', authenticateToken, async (req, res) => {
       });
     }
 
-    const parsedConsentTimestamp = consentTimestamp ? new Date(consentTimestamp) : null;
-    if (parsedConsentTimestamp && Number.isNaN(parsedConsentTimestamp.getTime())) {
+    if (typeof country !== 'string' || !country.trim()) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid consent timestamp.',
+        error: 'Country is required.',
+      });
+    }
+
+    if (!['18+', '13-17'].includes(ageGroup)) {
+      return res.status(400).json({
+        success: false,
+        error: 'You must be at least 13 and confirm your age group.',
+      });
+    }
+
+    if (ageGroup === '13-17' && (
+      typeof parentGuardianEmail !== 'string' ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentGuardianEmail.trim())
+    )) {
+      return res.status(400).json({
+        success: false,
+        error: 'A valid parent/guardian email is required for applicants under 18.',
+      });
+    }
+
+    if (typeof mediaPermission !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide your media permission choice.',
+      });
+    }
+
+    if (consentConfirmed !== true) {
+      return res.status(400).json({
+        success: false,
+        error: 'Application consent is required.',
       });
     }
 
@@ -159,7 +188,7 @@ router.post('/apply', authenticateToken, async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO bench_club_applications 
        (user_id, full_name, email, instagram_handle, phone_number, lift_type, weight_tier, video_url, additional_notes, country, age_group, parent_guardian_email, media_permission, footage_approved_for_promo, consent_timestamp, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'pending', NOW())`,
       [
         user_id,
         fullName.trim().substring(0, 100),
@@ -170,13 +199,11 @@ router.post('/apply', authenticateToken, async (req, res) => {
         parseInt(weightTier, 10) || 0,
         videoUrl.trim().substring(0, 500),
         additionalNotes ? additionalNotes.trim().substring(0, 500) : null,
-        country ? country.trim().substring(0, 100) : null,
-        ageGroup || null,
+        country.trim().substring(0, 100),
+        ageGroup,
         parentGuardianEmail ? parentGuardianEmail.trim().toLowerCase().substring(0, 255) : null,
-        mediaPermission === true,
-        footageApprovedForPromo === true,
-        parsedConsentTimestamp,
-        'pending',
+        mediaPermission,
+        ageGroup === '18+' && mediaPermission,
       ]
     );
 
@@ -193,6 +220,7 @@ router.post('/apply', authenticateToken, async (req, res) => {
         user_id,
         video_url: videoUrl,
         status: 'pending',
+        consent_confirmed: true,
         submitted_at: new Date().toISOString(),
       },
     });
@@ -230,6 +258,12 @@ router.get('/my-applications', authenticateToken, async (req, res) => {
         weight_tier, 
         video_url, 
         additional_notes as notes, 
+        country,
+        age_group,
+        parent_guardian_email,
+        media_permission,
+        footage_approved_for_promo,
+        consent_timestamp,
         status, 
         created_at,
         updated_at as reviewed_at
@@ -296,7 +330,10 @@ router.get('/applications', async (req, res) => {
         id, full_name as name, email, 
         phone_number as phone, instagram_handle, 
         lift_type, weight_tier, video_url, 
-        additional_notes as notes, status, created_at
+        additional_notes as notes, country, age_group,
+        parent_guardian_email, media_permission,
+        footage_approved_for_promo, consent_timestamp,
+        status, created_at
       FROM bench_club_applications
     `;
 
