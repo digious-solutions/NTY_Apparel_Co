@@ -79,6 +79,12 @@ type Application = {
   weight_tier: number;
   video_url: string;
   notes: string | null;
+  country?: string | null;
+  age_group?: string | null;
+  parent_guardian_email?: string | null;
+  media_permission?: boolean | null;
+  footage_approved_for_promo?: boolean | null;
+  consent_timestamp?: string | null;
   status: "pending" | "approved" | "rejected";
   created_at: string;
   reviewed_at?: string | null;
@@ -402,9 +408,12 @@ export function MyBenchClub() {
                     </div>
                     <div className="mt-1.5 text-sm text-gray-600">
                       <p>Lift: {app.lift_type}</p>
+                      <p>Country: {app.country || "Not provided"} · Age: {app.age_group || "Not provided"}</p>
                       {app.instagram_handle && (
                         <p>Instagram: @{app.instagram_handle}</p>
                       )}
+                      <p>Media permission: {app.media_permission === null || app.media_permission === undefined ? "Not recorded" : app.media_permission ? "Granted" : "Not granted"}</p>
+                      <p>Application consent: {app.consent_timestamp ? `Confirmed ${new Date(app.consent_timestamp).toLocaleString()}` : "Not recorded"}</p>
                     </div>
                   </div>
                   {app.video_url && app.status === "approved" && (

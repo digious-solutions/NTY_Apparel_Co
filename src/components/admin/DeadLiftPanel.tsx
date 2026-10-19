@@ -16,6 +16,12 @@ type App = {
   weight_tier: number;
   video_url: string | null;
   notes: string | null;
+  country: string | null;
+  age_group: string | null;
+  parent_guardian_email: string | null;
+  media_permission: boolean;
+  footage_approved_for_promo: boolean;
+  consent_timestamp: string | null;
   status: string;
   created_at: string;
 };
@@ -353,6 +359,15 @@ export function DeadLiftPanel() {
                         {a.instagram_handle && (
                           <span className="flex items-center gap-1.5"><Instagram className="w-3.5 h-3.5 text-pink-500" /> @{a.instagram_handle}</span>
                         )}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[hsl(215,16%,47%)]">
+                        <span>Country: {a.country || "Not provided"}</span>
+                        <span>Age: {a.age_group || "Not provided"}</span>
+                        {a.parent_guardian_email && <span>Parent/guardian: {a.parent_guardian_email}</span>}
+                        <span>Media permission: {a.media_permission ? "Granted" : "Not granted"}</span>
+                        {/* <span>Promo use: {a.footage_approved_for_promo ? "Approved" : a.media_permission ? "Awaiting guardian approval" : "Not approved"}</span> */}
+                        <span>Consent: {a.consent_timestamp ? `Confirmed ${new Date(a.consent_timestamp).toLocaleString()}` : "Not confirmed"}</span>
                       </div>
 
                       {a.video_url && (
