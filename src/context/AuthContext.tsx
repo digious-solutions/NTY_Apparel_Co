@@ -17,6 +17,7 @@ type AuthContextType = {
   signUp: (name: string, email: string, password: string) => Promise<void>;
   updateUser: (user: User) => void;
   signOut: () => Promise<void>;
+  expireSession: () => void;
   isAdmin: () => boolean;
 };
 
@@ -29,33 +30,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  const clearSession = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+  };
+
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
 
-    console.log('🔍 AuthProvider: Loading from localStorage', { storedToken, storedUser });
+    const restoreSession = async () => {
+      if (!storedToken || !storedUser) {
+        clearSession();
+        setLoading(false);
+        return;
+      }
 
-    if (storedToken && storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        console.log('✅ AuthProvider: User loaded from storage', parsedUser);
-        setToken(storedToken);
-        setUser(parsedUser);
+        JSON.parse(storedUser);
       } catch (error) {
         console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
+        clearSession();
+        setLoading(false);
+        return;
       }
-    } else {
-      console.log('❌ AuthProvider: No user in storage');
-    }
-    setLoading(false);
+
+      try {
+        const response = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+
+        if (response.status === 401) {
+          clearSession();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Session validation failed (${response.status}).`);
+        }
+
+        const data = await response.json();
+        const currentUser = data.data?.user as User | undefined;
+        if (!currentUser) {
+          throw new Error('Session validation returned no user.');
+        }
+
+        setToken(storedToken);
+        setUser(currentUser);
+        localStorage.setItem('auth_user', JSON.stringify(currentUser));
+      } catch (error) {
+        console.error('Failed to validate stored session:', error);
+        toast.error('Session is expired. Login again to access your dashboard.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void restoreSession();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 signIn called with:', { email });
-
     try {
       const response = await fetch(`${API_URL}/api/auth/signin/`, {
         method: 'POST',
@@ -64,15 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const data = await response.json();
-      console.log('📡 signIn response:', data);
-
       if (!response.ok) {
         throw new Error(data.error || 'Sign in failed.');
       }
 
       const { user, token } = data.data;
-      console.log('✅ signIn success, user:', user, 'role:', user.role);
-
       setUser(user);
       setToken(token);
       localStorage.setItem('auth_token', token);
@@ -100,8 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user, token } = data.data;
-      console.log('✅ signUp success, user:', user, 'role:', user.role);
-
       setUser(user);
       setToken(token);
       localStorage.setItem('auth_token', token);
@@ -120,11 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    console.log('🚪 signOut called');
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+    clearSession();
     toast.success('Signed out successfully.');
   };
 
@@ -133,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, signOut, isAdmin, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, signOut, expireSession: clearSession, isAdmin, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

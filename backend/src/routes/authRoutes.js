@@ -8,7 +8,7 @@ import { sendEmail, getOTPEmailTemplate } from '../services/emailService.js';
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
-const JWT_EXPIRY = '7d';
+const JWT_EXPIRY = '30d';
 
 // Helper: Generate JWT Token
 const generateToken = (userId, email, role) => {
@@ -521,7 +521,7 @@ router.post('/set-password', async (req, res) => {
     const authToken = jwt.sign(
       { id: userId, email: invite.email, role: 'customer' },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_EXPIRY }
     );
 
     res.json({
