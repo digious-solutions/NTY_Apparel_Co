@@ -80,6 +80,20 @@ describe("MyBenchClub Deadlift products", () => {
     expect(within(section).getByText(/for verified Deadlift Club members/)).toBeInTheDocument();
   });
 
+  it("shows a data-loading error instead of reporting the customer as not a member", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    }));
+    render(<MyBenchClub />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your Bench Club data could not be loaded",
+    );
+    expect(screen.queryByText("NOT A MEMBER")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
   it("unlocks only products at or below the verified Deadlift tier", async () => {
     mockApiResponses([
       { id: 1, name: "Test User", email: "test@example.com", lift_type: "Bench Press", weight_tier: 405, member_number: 1 },

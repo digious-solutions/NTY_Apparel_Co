@@ -187,10 +187,11 @@ function TierLadder({
 }
 
 export function MyBenchClub() {
-  const { user, token } = useAuth();
+  const { user, token, expireSession } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && token) {
@@ -202,6 +203,9 @@ export function MyBenchClub() {
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadError(null);
+    setMembers([]);
+    setApplications([]);
     try {
       // ✅ Fetch member status
       const memberRes = await fetch(`${API_URL}/api/bench-club/my-member`, {
@@ -211,6 +215,10 @@ export function MyBenchClub() {
       });
 
       if (!memberRes.ok) {
+        if (memberRes.status === 401) {
+          expireSession();
+          throw new Error("Your session has expired. Please sign in again.");
+        }
         throw new Error(`Failed to load memberships (${memberRes.status}).`);
       }
       const memberData = await memberRes.json();
@@ -229,6 +237,10 @@ export function MyBenchClub() {
       });
 
       if (!appsRes.ok) {
+        if (appsRes.status === 401) {
+          expireSession();
+          throw new Error("Your session has expired. Please sign in again.");
+        }
         throw new Error(`Failed to load applications (${appsRes.status}).`);
       }
       const appsData = await appsRes.json();
@@ -239,7 +251,9 @@ export function MyBenchClub() {
 
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to load your Bench Club data");
+      const message = error instanceof Error ? error.message : "Failed to load your Bench Club data.";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -277,6 +291,26 @@ export function MyBenchClub() {
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B8860B]"></div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section role="alert" className="border border-red-200 bg-red-50 p-6 rounded-lg">
+        <h3 className="text-lg font-semibold">Your Bench Club data could not be loaded</h3>
+        <p className="text-sm mt-2">{loadError}</p>
+        {loadError.includes("session has expired") ? (
+          <a href="/auth" className="inline-block mt-4 underline">Sign in again</a>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void fetchData()}
+            className="mt-4 underline"
+          >
+            Try again
+          </button>
+        )}
+      </section>
     );
   }
 
