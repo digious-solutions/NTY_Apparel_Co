@@ -32,7 +32,7 @@ const BenchClubShop = () => {
               MEMBERS ONLY
             </h1>
             <p className="font-body text-sm text-muted-foreground mb-8 leading-relaxed">
-              The Bench Club shop is reserved for verified members. Apply to the Natty Bench Press Club to unlock access.
+              The Bench Club shop is reserved for verified members. Apply to the NATTY VERIFIED to unlock access.
             </p>
             <button
               onClick={() => navigate("/bench-club")}

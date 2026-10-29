@@ -52,6 +52,7 @@ export const sendEmail = async (to, template) => {
       subject: template.subject,
       html: template.html,
       text: template.text || '',
+      attachments: template.attachments,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -128,62 +129,372 @@ export const getOTPEmailTemplate = (otp, expiresInMinutes = 10) => {
   };
 };
 
-export const getBenchClubReceivedEmail = (name, tier) => {
+export const getLiftName = (liftType) =>
+  String(liftType).trim().toLowerCase() === 'bench press' ? 'Bench Press' : 'Deadlift';
+
+const escapeHtml = (value) =>
+  String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+
+const emailHtml = (title, preview, content) => `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+      body { margin: 0; padding: 0; background: #f4f4f4; color: #1a1a1a; font-family: Arial, sans-serif; }
+      .preheader { display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all; }
+      .container { max-width: 600px; margin: 0 auto; padding: 28px 24px; background: #fff; }
+      .brand { margin: 0 0 28px; padding-bottom: 16px; border-bottom: 2px solid #111; font-size: 16px; letter-spacing: 3px; }
+      p, li { font-size: 15px; line-height: 1.7; }
+      h2 { margin: 28px 0 12px; font-size: 17px; }
+      ul { padding-left: 22px; }
+      .offer { margin: 18px 0; padding: 16px; background: #f5f5f5; }
+      .signoff { margin-top: 28px; }
+      a { color: #111; }
+    </style>
+  </head>
+  <body>
+    <div class="preheader">${preview}</div>
+    <div class="container">
+      <p class="brand"><strong>NATTY</strong> APPAREL</p>
+      ${content}
+    </div>
+  </body>
+  </html>
+`;
+
+const memberDashboard = `
+  <h2>YOUR MEMBER DASHBOARD</h2>
+  <p>Access your unlocked apparel, view your verified lifts, submit new lifts, and connect with members through our Discord.</p>
+  <p><a href="https://login.ntygear.com/auth" style="text-decoration: underline; color: black;"v>View your dashboard</a></p>
+`;
+
+const signoff = `
+  <p class="signoff">Stay Real. Stay Natty.</p>
+  <p>The Natty Team</p>
+`;
+
+export const getBenchClubReceivedEmail = (name) => {
+  const subject = 'We’ve Received Your Natty Verified Application';
+  const preview = 'Your lift has been submitted. Here’s what happens next.';
+  const firstName = escapeHtml(name);
+
   return {
-    subject: '✅ Bench Club Application Received - NATTY Apparel',
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Application Received</title>
-        <style>
-          body { font-family: 'Arial', sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-          .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #000000; }
-          .header h1 { font-size: 24px; color: #1a1a1a; margin: 0; }
-          .header span { color: #000000; }
-          .success-icon { text-align: center; font-size: 48px; margin: 20px 0; }
-          .info { color: #666666; font-size: 14px; line-height: 1.6; }
-          .footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999999; }
-          .highlight { color: #000000; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>NTY <span>APPAREL</span></h1>
-            <p style="color: #666; font-size: 14px; margin: 5px 0 0;">Bench Club Application</p>
-          </div>
+    subject,
+    preview,
+    html: emailHtml(subject, preview, `
+      <p>Hey ${firstName},</p>
+      <p>We’ve received your Natty Verified application!</p>
+      <p>Our team will review your submission to ensure it meets our verification standards.</p>
+      <p>We do our best to review applications within 48 hours, although high submission volume can occasionally cause delays.</p>
+      <p>You’ll receive another email once your application has been reviewed.</p>
+      <p>Once approved, you’ll officially unlock access to our exclusive Natty Verified apparel.</p>
+      <h2>YOUR MEMBER DASHBOARD</h2>
+      <p>Visit your dashboard to track your submissions, view your verification status, and submit new lifts.</p>
+      <p><a href="https://login.ntygear.com/auth" style="text-decoration: underline; color: black;">View your dashboard</a></p>
+      ${signoff}
+    `),
+    text: `Hey ${name},
 
-          <div style="padding: 20px 0;">
-            <div class="success-icon">✅</div>
-            <h2 style="text-align: center; color: #1a1a1a;">Application Received!</h2>
-            <p style="font-size: 16px; color: #333; text-align: center;">Hey <span class="highlight">${name}</span>,</p>
-            <p style="font-size: 16px; color: #333; text-align: center;">Your <span class="highlight">${tier} lb</span> Bench Club application has been received.</p>
-            <p style="font-size: 14px; color: #666; text-align: center; margin-top: 20px;">We'll review your video and get back to you within 48 hours.</p>
-          </div>
+We’ve received your Natty Verified application!
 
-          <div class="footer">
-            <p>NTY Apparel &bull; Built for the natural athlete</p>
-            <p style="margin-top: 5px;">© ${new Date().getFullYear()} NTY Apparel. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `
-      NTY APPAREL - Bench Club Application Received
+Our team will review your submission to ensure it meets our verification standards.
 
-      Hey ${name},
+We do our best to review applications within 48 hours, although high submission volume can occasionally cause delays.
 
-      Your ${tier} lb Bench Club application has been received.
+You’ll receive another email once your application has been reviewed.
 
-      We'll review your video and get back to you within 48 hours.
+Once approved, you’ll officially unlock access to our exclusive Natty Verified apparel.
 
-      NTY Apparel - Built for the natural athlete
-    `,
+YOUR MEMBER DASHBOARD
+
+Visit your dashboard to track your submissions, view your verification status, and submit new lifts.
+
+https://login.ntygear.com/auth
+
+Stay Real. Stay Natty.
+
+The Natty Team`,
+  };
+};
+
+export const getBenchClubApprovedEmail = (name) => {
+  const subject = 'You’re In! Welcome to the Natty Verified Bench Club';
+  const preview = 'You’ve earned your spot. Now unlock your exclusive member offer.';
+  const firstName = escapeHtml(name);
+
+  return {
+    subject,
+    preview,
+    html: emailHtml(subject, preview, `
+      <p>Hey ${firstName},</p>
+      <p><strong>Congratulations! You’re officially in!</strong></p>
+      <p>We’ve reviewed your lift, and you’re now an official member of the <strong>Natty Verified Bench Press Club!</strong></p>
+      <p>Welcome to the club.</p>
+      <p>And now you’ve earned something else.</p>
+      <p><strong>Exclusive access to Natty Verified apparel.</strong></p>
+      <h2>YOUR EXCLUSIVE WELCOME OFFER</h2>
+      <p>Our second drop is expected mid to late November, and as a newly verified member, you’re getting a special welcome offer.</p>
+      <div class="offer">
+        <p><strong>Natty Verified Bench Club Tee</strong></p>
+        <p>Regular Price: $55</p>
+        <p><strong>Your Price: $40 (Save $15)</strong></p>
+        <p>Available in Black and Ivory.</p>
+        <p>FREE U.S. shipping.</p>
+      </div>
+      <h2>PRE-ORDER NOW – PAY IN FULL</h2>
+      <p>U.S. ($40):<br><a href="https://buy.stripe.com/aFacMX58Uaa05eJ0JE8IU0e" style="text-decoration: underline; color:black">Order in the U.S.</a></p>
+      <p>International ($50, including $10 shipping):<br><a href="https://buy.stripe.com/14A7sDeJueqgcHb2RM8IU0f" style="text-decoration: underline; color:black">International order</a></p>
+      <h2>OR RESERVE YOURS FOR $10</h2>
+      <p>Not ready to pay in full? Secure your shirt with a $10 reservation and pay the remaining balance later.</p>
+      <p><a href="https://buy.stripe.com/3cI5kvgRC6XOfTneAu8IU07" style="text-decoration: underline; color:black">Reserve your tee for $10</a></p>
+      <p>Your reservation option totals $45 for U.S. orders, including shipping. International shipping is additional.</p>
+      <p>This offer is exclusive to Natty Verified members. Drop 2 is a pre-order, and shipping begins once inventory arrives.</p>
+      <h2>MORE THAN JUST CLOTHING</h2>
+      <p>We created Natty to be more than another fitness apparel brand. When someone sees you wearing Natty Verified, they know you didn’t just buy your way in.</p>
+      <p>You earned it.</p>
+      ${memberDashboard}
+      <p>Welcome to the club. Wear it with pride.</p>
+      ${signoff}
+    `),
+    text: `Hey ${name},
+
+Congratulations! You’re officially in!
+
+We’ve reviewed your lift, and you’re now an official member of the Natty Verified Bench Press Club!
+
+Welcome to the club.
+
+And now you’ve earned something else.
+
+Exclusive access to Natty Verified apparel.
+
+YOUR EXCLUSIVE WELCOME OFFER
+
+Our second drop is expected mid to late November, and as a newly verified member, you’re getting a special welcome offer.
+
+Natty Verified Bench Club Tee
+Regular Price: $55
+Your Price: $40 (Save $15)
+Available in Black and Ivory.
+FREE U.S. shipping.
+
+PRE-ORDER NOW – PAY IN FULL
+
+U.S. ($40):
+https://buy.stripe.com/aFacMX58Uaa05eJ0JE8IU0e
+
+International ($50, including $10 shipping):
+https://buy.stripe.com/14A7sDeJueqgcHb2RM8IU0f
+
+OR RESERVE YOURS FOR $10
+
+Not ready to pay in full? Secure your shirt with a $10 reservation and pay the remaining balance later.
+https://buy.stripe.com/3cI5kvgRC6XOfTneAu8IU07
+
+Your reservation option totals $45 for U.S. orders, including shipping. International shipping is additional.
+
+This offer is exclusive to Natty Verified members. Drop 2 is a pre-order, and shipping begins once inventory arrives.
+
+MORE THAN JUST CLOTHING
+
+We created Natty to be more than another fitness apparel brand. When someone sees you wearing Natty Verified, they know you didn’t just buy your way in.
+
+You earned it.
+
+YOUR MEMBER DASHBOARD
+
+Access your unlocked apparel, view your verified lifts, submit new lifts, and connect with members through our Discord.
+https://login.ntygear.com/auth
+
+Welcome to the club. Wear it with pride.
+
+Stay Real. Stay Natty.
+
+The Natty Team`,
+  };
+};
+
+export const getDeadliftApprovedEmail = (name) => {
+  const subject = 'You’re In! Welcome to the Natty Verified Deadlift Club';
+  const preview = 'You’ve earned your spot. Now unlock your exclusive member offer.';
+  const firstName = escapeHtml(name);
+
+  return {
+    subject,
+    preview,
+    html: emailHtml(subject, preview, `
+      <p>Hey ${firstName},</p>
+      <p><strong>Congratulations! You’re officially in!</strong></p>
+      <p>We’ve reviewed your lift, and you’re now an official member of the <strong>Natty Verified Deadlift Club!</strong></p>
+      <p>Welcome to the club.</p>
+      <p>And now you’ve earned something else.</p>
+      <p><strong>Exclusive access to Natty Verified apparel.</strong></p>
+      <h2>YOUR EXCLUSIVE WELCOME OFFER</h2>
+      <p>Our first drop of Deadlift Club Shorts is expected mid to late November, and as a newly verified member, you’re getting a special welcome offer.</p>
+      <div class="offer">
+        <p><strong>Natty Verified Deadlift Club Shorts</strong></p>
+        <p>Regular Price: $55</p>
+        <p><strong>Your Price: $40 (Save $15)</strong></p>
+        <p>Fewer than 100 pairs available.</p>
+        <p>FREE U.S. shipping.</p>
+      </div>
+      <h2>PRE-ORDER NOW – PAY IN FULL</h2>
+      <p>U.S. ($40):<br><a href="https://buy.stripe.com/3cI00b6cYfuk8qV7828IU0c" style="text-decoration: underline; color:black">Order in the U.S.</a></p>
+      <p>International ($50, shipping included):<br><a href="https://buy.stripe.com/7sYbITdFqaa036BeAu8IU0d" style="text-decoration: underline; color:black">International order</a></p>
+      <h2>OR RESERVE YOURS FOR $10</h2>
+      <p>Not ready to pay in full? Secure your shorts with a $10 reservation and pay the remaining balance later.</p>
+      <p><a href="https://buy.stripe.com/14AeV5gRC2HygXr3VQ8IU09">Reserve your shorts for $10</a></p>
+      <p>Your reservation option totals $45 for U.S. orders, including shipping. International shipping is additional.</p>
+      <p>This offer is exclusive to Natty Verified members. Your pre-order secures your shorts from our limited first drop, with shipping beginning once inventory arrives.</p>
+      <h2>MORE THAN JUST CLOTHING</h2>
+      <p>We created Natty to be more than another fitness apparel brand. When someone sees you wearing Natty Verified, they know you didn’t just buy your way in.</p>
+      <p>You earned it.</p>
+      ${memberDashboard}
+      <p>Welcome to the club. Wear it with pride.</p>
+      ${signoff}
+    `),
+    text: `Hey ${name},
+
+Congratulations! You’re officially in!
+
+We’ve reviewed your lift, and you’re now an official member of the Natty Verified Deadlift Club!
+
+Welcome to the club.
+
+And now you’ve earned something else.
+
+Exclusive access to Natty Verified apparel.
+
+YOUR EXCLUSIVE WELCOME OFFER
+
+Our first drop of Deadlift Club Shorts is expected mid to late November, and as a newly verified member, you’re getting a special welcome offer.
+
+Natty Verified Deadlift Club Shorts
+Regular Price: $55
+Your Price: $40 (Save $15)
+Fewer than 100 pairs available.
+FREE U.S. shipping.
+
+PRE-ORDER NOW – PAY IN FULL
+
+U.S. ($40):
+https://buy.stripe.com/3cI00b6cYfuk8qV7828IU0c
+
+International ($50, shipping included):
+https://buy.stripe.com/7sYbITdFqaa036BeAu8IU0d
+
+OR RESERVE YOURS FOR $10
+
+Not ready to pay in full? Secure your shorts with a $10 reservation and pay the remaining balance later.
+https://buy.stripe.com/14AeV5gRC2HygXr3VQ8IU09
+
+Your reservation option totals $45 for U.S. orders, including shipping. International shipping is additional.
+
+This offer is exclusive to Natty Verified members. Your pre-order secures your shorts from our limited first drop, with shipping beginning once inventory arrives.
+
+MORE THAN JUST CLOTHING
+
+We created Natty to be more than another fitness apparel brand. When someone sees you wearing Natty Verified, they know you didn’t just buy your way in.
+
+You earned it.
+
+YOUR MEMBER DASHBOARD
+
+Access your unlocked apparel, view your verified lifts, submit new lifts, and connect with members through our Discord.
+https://login.ntygear.com/auth
+
+Welcome to the club. Wear it with pride.
+
+Stay Real. Stay Natty.
+
+The Natty Team`,
+  };
+};
+
+const rejectionRequirements = {
+  bench: [
+    'Must be a natural lifter.',
+    'Standard barbell bench press only. No Smith machines.',
+    'Bar must touch the chest.',
+    'Full lockout required.',
+    'No spotter assistance.',
+    'No slingshots or supportive bench shirts.',
+    'No excessive bouncing or hip thrusting.',
+    'Weight plates must be clearly visible.',
+    'Full, unedited lift video required.',
+  ],
+  deadlift: [
+    'Must be a natural lifter.',
+    'Lift must begin with the barbell on the floor.',
+    'Conventional and sumo deadlifts are allowed.',
+    'Full lockout required, including hips and knees.',
+    'Straps and belts are allowed.',
+    'No rack pulls, Romanian deadlifts, or trap/hex bars.',
+    'No supportive deadlift suits or hitching.',
+    'Weight plates must be clearly visible.',
+    'Full, unedited lift video required.',
+  ],
+};
+
+export const getApplicationRejectedEmail = (name, liftType) => {
+  const liftName = getLiftName(liftType);
+  const clubName = liftName === 'Bench Press' ? 'Bench Club' : 'Deadlift Club';
+  const requirements = liftName === 'Bench Press' ? rejectionRequirements.bench : rejectionRequirements.deadlift;
+  const title = `Update on Your Natty Verified ${clubName} Application`;
+  const requirementTitle = liftName === 'Bench Press' ? 'BENCH CLUB REQUIREMENTS' : 'DEADLIFT CLUB REQUIREMENTS';
+  const firstName = escapeHtml(name);
+
+  return {
+    subject: title,
+    preview: `We’ve reviewed your Natty Verified ${clubName} application.`,
+    html: emailHtml(title, `We’ve reviewed your Natty Verified ${clubName} application.`, `
+      <p>Hey ${firstName},</p>
+      <p>We’ve reviewed your Natty Verified ${clubName} application.</p>
+      <p>Unfortunately, we weren’t able to approve your submission at this time.</p>
+      <p>This doesn’t necessarily mean you aren’t strong enough. It simply means your submitted lift didn’t meet all of our verification requirements.</p>
+      <h2>${requirementTitle}</h2>
+      <ul>${requirements.map((requirement) => `<li>${requirement}</li>`).join('')}</ul>
+      <p>You’re welcome to submit another video that meets these requirements.</p>
+      <h2>YOUR MEMBER DASHBOARD</h2>
+      <p>Review your submissions, check your status, and submit a new lift here:</p>
+      <p><a href="https://login.ntygear.com/auth">View your dashboard</a></p>
+      <p>We hope to welcome you to the club soon.</p>
+      ${signoff}
+    `),
+    text: `Hey ${name},
+
+We’ve reviewed your Natty Verified ${clubName} application.
+
+Unfortunately, we weren’t able to approve your submission at this time.
+
+This doesn’t necessarily mean you aren’t strong enough. It simply means your submitted lift didn’t meet all of our verification requirements.
+
+${requirementTitle}
+
+${requirements.map((requirement) => `- ${requirement}`).join('\n')}
+
+You’re welcome to submit another video that meets these requirements.
+
+YOUR MEMBER DASHBOARD
+
+Review your submissions, check your status, and submit a new lift here:
+
+https://login.ntygear.com/auth
+
+We hope to welcome you to the club soon.
+
+Stay Real. Stay Natty.
+
+The Natty Team`,
   };
 };
 

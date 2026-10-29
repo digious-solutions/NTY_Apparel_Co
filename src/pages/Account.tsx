@@ -9,15 +9,17 @@ import { MyOrders } from "@/components/account/MyOrders";
 import { MyCodes } from "@/components/account/MyCodes";
 import { MyAffiliate } from "@/components/account/MyAffiliate";
 import { MyBenchClub } from "@/components/account/MyBenchClub";
-import { Gift, Package, User, MapPin, LogOut, Ticket, Users, Dumbbell } from "lucide-react";
+import  MySubmitLift  from "@/components/account/MySubmitLift";
+import { Gift, Package, User, MapPin, LogOut, Ticket, Users, Dumbbell, Upload } from "lucide-react";
 
-type Section = "rewards" | "orders" | "codes" | "benchclub" | "affiliate" | "details" | "addresses";
+type Section = "rewards" | "orders" | "codes" | "benchclub" | "submitalift" | "affiliate" | "details" | "addresses";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   // { key: "rewards", label: "Rewards", icon: Gift },
   // { key: "orders", label: "Orders", icon: Package },
   // { key: "codes", label: "Codes", icon: Ticket },
   { key: "benchclub", label: "Natty Verified", icon: Dumbbell },
+  // { key: "submitalift", label: "Submit a lift", icon: Upload },
   { key: "affiliate", label: "Affiliate Dashboard", icon: Users },
   { key: "details", label: "Account Details", icon: User },
   { key: "addresses", label: "Addresses", icon: MapPin },
@@ -161,6 +163,7 @@ const Account = () => {
               {section === "orders" && <MyOrders email={user.email} />}
               {section === "codes" && <MyCodes email={user.email} />}
               {section === "benchclub" && <MyBenchClub />}
+              {section === "submitalift" && <MySubmitLift />}
               {section === "affiliate" && <MyAffiliate email={user.email} />}
               {section === "details" && (
                 <AccountDetails

@@ -123,7 +123,7 @@ export function BenchClubPanel() {
   }, [filter]);
 
   // ✅ Send Email Function
-  const sendStatusEmail = async (email: string, name: string, status: string, tier: number, memberNumber?: number) => {
+  const sendStatusEmail = async (email: string, name: string, status: string, tier: number, liftType: string, memberNumber?: number) => {
     try {
       const response = await fetch(`${API_URL}/api/email/bench-club-status`, {
         method: "POST",
@@ -132,6 +132,7 @@ export function BenchClubPanel() {
           email,
           name: name.split(" ")[0] || name,
           tier,
+          liftType,
           status,
           memberNumber: memberNumber || null,
         }),
@@ -176,7 +177,7 @@ export function BenchClubPanel() {
       }
 
       // ✅ Send approval email
-      await sendStatusEmail(a.email, a.name, 'approved', a.weight_tier, memberNumber);
+      await sendStatusEmail(a.email, a.name, 'approved', a.weight_tier, a.lift_type, memberNumber);
 
       await loadData(false);
     } catch (e: any) {
@@ -202,7 +203,7 @@ export function BenchClubPanel() {
       toast.success("Application rejected.");
 
       // ✅ Send rejection email
-      await sendStatusEmail(a.email, a.name, 'rejected', a.weight_tier);
+      await sendStatusEmail(a.email, a.name, 'rejected', a.weight_tier, a.lift_type);
 
       await loadData(false);
     } catch (e: any) {
