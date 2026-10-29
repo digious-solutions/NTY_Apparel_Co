@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Upload, CheckCircle2, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import NattyVerifiedAuthDialog from "@/components/NattyVerifiedAuthDialog";
 
 interface BenchClubFormProps {
   onSuccess?: () => void;
@@ -43,7 +43,6 @@ const COUNTRIES = [
 
 const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
   const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -63,6 +62,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     consentConfirmed: false,
   });
   const [loading, setLoading] = useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [step, setStep] = useState<"idle" | "uploading" | "submitting" | "done">("idle");
@@ -165,8 +165,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     if (loading) return;
 
     if (!user) {
-      toast.error("Please login first to submit your application.");
-      navigate("/auth");
+      setAuthDialogOpen(true);
       return;
     }
 
@@ -270,6 +269,7 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
             email: email.trim().toLowerCase(),
             name: fullName.trim().split(" ")[0],
             tier: weightTier,
+            liftType: formData.lift,
           }),
         });
       } catch (emailError) {
@@ -287,31 +287,34 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     }
   };
 
-  // ✅ Show login required message if not authenticated
+  // Keep the application page visible while login or account creation happens in the dialog.
   if (!authLoading && !user) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white p-8 md:p-10 rounded-xl shadow-lg border border-gray-200 text-center"
-      >
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
-            <Lock className="w-8 h-8 text-amber-600" />
+      <>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-lg md:p-10"
+        >
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+              <Lock className="h-8 w-8 text-amber-600" />
+            </div>
+            <h3 className="mb-2 text-xl font-semibold text-gray-900">Login Required</h3>
+            <p className="mb-6 max-w-md text-gray-600">
+              Sign in or create an account to submit your Natty Verified application. You&apos;ll stay right here.
+            </p>
+            <button
+              onClick={() => setAuthDialogOpen(true)}
+              className="rounded-lg bg-[#B8860B] px-8 py-3 font-medium text-white transition-colors hover:bg-[#a0750a]"
+            >
+              Login or Create Account
+            </button>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Login Required</h3>
-          <p className="text-gray-600 mb-6 max-w-md">
-            Please login to your account to submit your Natty Verified application.
-          </p>
-          <button
-            onClick={() => navigate("/auth")}
-            className="bg-[#B8860B] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#a0750a] transition-colors"
-          >
-            Login to Apply
-          </button>
-        </div>
-      </motion.div>
+        </motion.div>
+        <NattyVerifiedAuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
+      </>
     );
   }
 

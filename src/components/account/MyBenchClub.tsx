@@ -367,7 +367,7 @@ export function MyBenchClub() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase opacity-70 mb-3">
               <Dumbbell className="w-3.5 h-3.5" />
-              {heroLift === "Bench Press" ? "Natty Bench Press Club" : "Natty Deadlift Club"}
+              {heroLift === "Bench Press" ? "NATTY VERIFIED" : "NATTY VERIFIED"}
             </div>
             <h3 className="text-3xl sm:text-4xl tracking-tight leading-none" style={{ fontFamily: "'Arial Black', sans-serif" }}>
               {heroIsMember

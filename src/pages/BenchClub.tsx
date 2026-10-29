@@ -21,7 +21,7 @@ const fadeUp = {
 };
 
 const tiers = [
-  { number: "225", name: "225 Club", desc: "The foundation of the Natty Bench Press Club.", patch: patch225.url },
+  { number: "225", name: "225 Club", desc: "The foundation of the NATTY VERIFIED.", patch: patch225.url },
   { number: "315", name: "315 Club", desc: "Elite-level natural pressing strength.", patch: patch315.url },
   { number: "405", name: "405 Club", desc: "Reserved for the rare few.", patch: patch405.url },
 ];
@@ -187,14 +187,14 @@ const BenchClub = () => {
             custom={2} variants={fadeUp}
             className="font-body text-base text-foreground/80 leading-relaxed mb-6"
           >
-            The Natty Bench Press Club was created to recognize natural lifters who have earned one of the most respected milestones in strength training: a legitimate 225-pound bench press and beyond.
+            The NATTY VERIFIED was created to recognize natural lifters who have earned one of the most respected milestones in strength training: a legitimate 225-pound bench press and beyond.
           </motion.p>
           <motion.p
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
             custom={3} variants={fadeUp}
             className="font-body text-base text-foreground/80 leading-relaxed"
           >
-            In a world where almost every fitness brand can be bought by anyone, the Natty Bench Press Club is different.
+            In a world where almost every fitness brand can be bought by anyone, the NATTY VERIFIED is different.
           </motion.p>
           <motion.div
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
@@ -234,7 +234,7 @@ const BenchClub = () => {
             custom={2} variants={fadeUp}
             className="font-body text-base text-[hsl(0_0%_15%)] leading-relaxed mb-8"
           >
-            The Natty Bench Press Club exists to recognize lifters who earned that level of strength naturally through:
+            The NATTY VERIFIED exists to recognize lifters who earned that level of strength naturally through:
           </motion.p>
           <motion.div
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
@@ -531,7 +531,7 @@ const BenchClub = () => {
           custom={1} variants={fadeUp}
           className="font-body text-base text-foreground/80 max-w-xl mx-auto leading-relaxed mb-8"
           >
-            The Natty Bench Press Club exists to celebrate natural lifters who earned their strength the hard way.
+            The NATTY VERIFIED exists to celebrate natural lifters who earned their strength the hard way.
           </motion.p>
           <motion.div
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}

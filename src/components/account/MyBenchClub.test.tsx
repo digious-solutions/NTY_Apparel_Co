@@ -32,7 +32,7 @@ describe("MyBenchClub Deadlift products", () => {
     ]);
     render(<MyBenchClub />);
 
-    const clubLabel = await screen.findByText("Natty Deadlift Club");
+    const clubLabel = await screen.findByText("NATTY VERIFIED");
     const statusCard = clubLabel.closest("section");
     if (!statusCard) throw new Error("Membership status card was not rendered.");
 

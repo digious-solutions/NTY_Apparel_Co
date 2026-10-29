@@ -139,7 +139,7 @@ export const products: Product[] = [
     tag: "MEMBERS ONLY",
     style: "Accessories",
     description:
-      "The official Natty Bench Press Club patches — 135, 225, 315, 405. Earned, not bought. Available exclusively to verified Bench Club members.",
+      "The official NATTY VERIFIED patches — 135, 225, 315, 405. Earned, not bought. Available exclusively to verified Bench Club members.",
     details: [
       "Embroidered iron-on / sew-on patches",
       "One patch per tier earned",
