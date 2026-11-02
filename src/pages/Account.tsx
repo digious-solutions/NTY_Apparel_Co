@@ -19,7 +19,7 @@ const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   // { key: "orders", label: "Orders", icon: Package },
   // { key: "codes", label: "Codes", icon: Ticket },
   { key: "benchclub", label: "Natty Verified", icon: Dumbbell },
-  // { key: "submitalift", label: "Submit a lift", icon: Upload },
+  { key: "submitalift", label: "Submit a lift", icon: Upload },
   { key: "affiliate", label: "Affiliate Dashboard", icon: Users },
   { key: "details", label: "Account Details", icon: User },
   { key: "addresses", label: "Addresses", icon: MapPin },

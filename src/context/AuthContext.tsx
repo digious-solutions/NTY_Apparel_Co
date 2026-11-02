@@ -15,6 +15,7 @@ type AuthContextType = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
+  claimAccount: (email: string, otp: string, password: string) => Promise<void>;
   updateUser: (user: User) => void;
   signOut: () => Promise<void>;
   expireSession: () => void;
@@ -144,6 +145,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const claimAccount = async (email: string, otp: string, password: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/claim-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, password }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Account setup failed.');
+      }
+
+      const { user, token } = data.data;
+      setUser(user);
+      setToken(token);
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_user', JSON.stringify(user));
+      toast.success(data.message || 'Account created successfully!');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Account setup failed. Please try again.';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
     localStorage.setItem('auth_user', JSON.stringify(updatedUser));
@@ -159,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, signOut, expireSession: clearSession, isAdmin, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, claimAccount, signOut, expireSession: clearSession, isAdmin, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

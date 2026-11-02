@@ -1,5 +1,6 @@
 // src/routes/authRoutes.js
 import express from 'express';
+import { randomInt } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/index.js';
@@ -29,10 +30,58 @@ const getUserRole = async (userId) => {
   return users[0]?.role || 'customer';
 };
 
+const linkUserRecords = async (connection, userId, email) => {
+  await connection.execute(
+    `UPDATE bench_club_applications
+     SET user_id = ?
+     WHERE LOWER(TRIM(email)) = ? AND user_id IS NULL`,
+    [userId, email]
+  );
+  await connection.execute(
+    `UPDATE bench_club_members
+     SET user_id = ?
+     WHERE LOWER(TRIM(email)) = ? AND user_id IS NULL`,
+    [userId, email]
+  );
+};
+
+// Check whether an email belongs to an existing account or imported record.
+router.post('/check-email', async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid email address.' });
+    }
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
+    const [applications] = await pool.execute(
+      'SELECT id FROM bench_club_applications WHERE LOWER(TRIM(email)) = ? LIMIT 1',
+      [email]
+    );
+    const [members] = await pool.execute(
+      'SELECT id FROM bench_club_members WHERE LOWER(TRIM(email)) = ? LIMIT 1',
+      [email]
+    );
+    const hasImportedRecords = applications.length > 0 || members.length > 0;
+
+    res.json({
+      success: true,
+      data: {
+        hasAccount: users.length > 0,
+        canClaimAccount: users.length === 0 && hasImportedRecords,
+      },
+    });
+  } catch (error) {
+    console.error('Check email error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check this email. Please try again.' });
+  }
+});
+
 // ✅ Sign Up
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -51,13 +100,28 @@ router.post('/signup', async (req, res) => {
     // Check if user exists
     const [existing] = await pool.execute(
       'SELECT id FROM users WHERE email = ?',
-      [email.toLowerCase()]
+      [email]
     );
 
     if (Array.isArray(existing) && existing.length > 0) {
       return res.status(400).json({
         success: false,
         error: 'User already exists with this email.',
+      });
+    }
+
+    const [applications] = await pool.execute(
+      'SELECT id FROM bench_club_applications WHERE LOWER(TRIM(email)) = ? LIMIT 1',
+      [email]
+    );
+    const [members] = await pool.execute(
+      'SELECT id FROM bench_club_members WHERE LOWER(TRIM(email)) = ? LIMIT 1',
+      [email]
+    );
+    if (applications.length > 0 || members.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'This email has imported applications. Sign in with this email to verify it and set your password.',
       });
     }
 
@@ -68,13 +132,13 @@ router.post('/signup', async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO users (name, email, password_hash, role, created_at) 
        VALUES (?, ?, ?, ?, NOW())`,
-      [name.trim(), email.toLowerCase(), hashedPassword, 'customer']
+      [name.trim(), email, hashedPassword, 'customer']
     );
 
     const userId = result && result.insertId ? result.insertId : null;
 
     // Generate token
-    const token = generateToken(userId, email.toLowerCase(), 'customer');
+    const token = generateToken(userId, email, 'customer');
 
     res.status(201).json({
       success: true,
@@ -83,7 +147,7 @@ router.post('/signup', async (req, res) => {
         user: {
           id: userId,
           name: name.trim(),
-          email: email.toLowerCase(),
+          email,
           role: 'customer',
         },
         token,
@@ -101,7 +165,8 @@ router.post('/signup', async (req, res) => {
 // Sign In
 router.post('/signin', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const { password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -113,7 +178,7 @@ router.post('/signin', async (req, res) => {
     // Get user
     const [rows] = await pool.execute(
       'SELECT id, name, email, password_hash, role FROM users WHERE email = ?',
-      [email.toLowerCase()]
+      [email]
     );
 
     const users = Array.isArray(rows) ? rows : [];
@@ -133,6 +198,18 @@ router.post('/signin', async (req, res) => {
         success: false,
         error: 'Invalid email or password.',
       });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await linkUserRecords(connection, user.id, email);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
 
     // Generate token
@@ -236,7 +313,7 @@ router.get('/check-role/:userId', async (req, res) => {
 // ✅ Forgot Password - Send OTP
 router.post('/forgot-password', async (req, res) => {
   try {
-    const { email } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
 
     if (!email) {
       return res.status(400).json({
@@ -248,20 +325,33 @@ router.post('/forgot-password', async (req, res) => {
     // Check if user exists
     const [rows] = await pool.execute(
       'SELECT id, name FROM users WHERE email = ?',
-      [email.toLowerCase()]
+      [email]
     );
 
-    if (!rows.length) {
+    let user = rows[0];
+    if (!user) {
+      const [applications] = await pool.execute(
+        `SELECT full_name AS name FROM bench_club_applications
+         WHERE LOWER(TRIM(email)) = ? ORDER BY created_at ASC LIMIT 1`,
+        [email]
+      );
+      const [members] = await pool.execute(
+        `SELECT full_name AS name FROM bench_club_members
+         WHERE LOWER(TRIM(email)) = ? ORDER BY created_at ASC LIMIT 1`,
+        [email]
+      );
+      user = applications[0] || members[0];
+    }
+
+    if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'No account found with this email.',
+        error: 'No account or application found with this email.',
       });
     }
 
-    const user = rows[0];
-
     // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Save OTP in database
@@ -269,7 +359,7 @@ router.post('/forgot-password', async (req, res) => {
       `INSERT INTO password_resets (email, otp, expires_at) 
        VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE otp = ?, expires_at = ?`,
-      [email.toLowerCase(), otp, expiresAt, otp, expiresAt]
+      [email, otp, expiresAt, otp, expiresAt]
     );
 
     // ✅ SEND EMAIL WITH OTP (FIXED)
@@ -392,6 +482,97 @@ router.post('/reset-password', async (req, res) => {
       success: false,
       error: 'Failed to reset password.',
     });
+  }
+});
+
+// Create an account for an imported applicant after email OTP verification.
+router.post('/claim-account', async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const otp = typeof req.body.otp === 'string' ? req.body.otp.trim() : '';
+  const { password } = req.body;
+
+  if (!email || !otp || !password) {
+    return res.status(400).json({ success: false, error: 'Email, OTP, and password are required.' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, error: 'Please enter a valid email address.' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 6 characters.' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [existingUsers] = await connection.execute(
+      'SELECT id FROM users WHERE email = ? FOR UPDATE',
+      [email]
+    );
+    if (existingUsers.length > 0) {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        error: 'An account already exists. Please sign in with your password.',
+      });
+    }
+
+    const [otpRows] = await connection.execute(
+      'SELECT email FROM password_resets WHERE email = ? AND otp = ? AND expires_at > NOW() FOR UPDATE',
+      [email, otp]
+    );
+    if (!otpRows.length) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP.' });
+    }
+
+    const [applications] = await connection.execute(
+      `SELECT full_name AS name FROM bench_club_applications
+       WHERE LOWER(TRIM(email)) = ? ORDER BY created_at ASC LIMIT 1`,
+      [email]
+    );
+    const [members] = await connection.execute(
+      `SELECT full_name AS name FROM bench_club_members
+       WHERE LOWER(TRIM(email)) = ? ORDER BY created_at ASC LIMIT 1`,
+      [email]
+    );
+    const importedRecord = applications[0] || members[0];
+    if (!importedRecord) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'No imported application or membership was found for this email.',
+      });
+    }
+
+    const name = importedRecord.name?.trim() || email.split('@')[0];
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await connection.execute(
+      `INSERT INTO users (name, email, password_hash, role, created_at)
+       VALUES (?, ?, ?, 'customer', NOW())`,
+      [name, email, hashedPassword]
+    );
+    const userId = result.insertId;
+
+    await linkUserRecords(connection, userId, email);
+    await connection.execute('DELETE FROM password_resets WHERE email = ?', [email]);
+    await connection.commit();
+
+    const token = generateToken(userId, email, 'customer');
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully!',
+      data: {
+        user: { id: userId, name, email, role: 'customer' },
+        token,
+      },
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Claim account error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create your account. Please try again.' });
+  } finally {
+    connection.release();
   }
 });
 

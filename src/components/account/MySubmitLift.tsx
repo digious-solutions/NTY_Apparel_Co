@@ -10,6 +10,34 @@ interface BenchClubFormProps {
   onSuccess?: () => void;
 }
 
+type ExistingApplication = {
+  name?: string;
+  email?: string;
+  instagram_handle?: string;
+  phone_number?: string | null;
+  lift_type: string;
+  weight_tier: number;
+  country?: string | null;
+  age_group?: string | null;
+  parent_guardian_email?: string | null;
+  media_permission?: boolean | number | null;
+  status: string;
+};
+
+const hasActiveApplication = (
+  applications: ExistingApplication[],
+  lift: string,
+  weightTier: string,
+) => applications.some((application) => {
+  const status = application.status.toLowerCase();
+  const applicationLift = application.lift_type.trim().toLowerCase();
+  return (
+    (status === "pending" || status === "approved") &&
+    Number(application.weight_tier) === Number(weightTier) &&
+    (applicationLift === lift.trim().toLowerCase() || applicationLift === "both")
+  );
+});
+
 const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 
 // ✅ ADDITION 1 — Country list (US first, rest alphabetical)
@@ -42,7 +70,7 @@ const COUNTRIES = [
 ];
 
 const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -62,6 +90,9 @@ const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
     consentConfirmed: false,
   });
   const [loading, setLoading] = useState(false);
+  const [existingApplications, setExistingApplications] = useState<ExistingApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [applicationsLoadError, setApplicationsLoadError] = useState("");
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -85,6 +116,64 @@ const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !token) {
+      setExistingApplications([]);
+      setApplicationsLoadError("");
+      return;
+    }
+
+    let cancelled = false;
+    const loadPreviousApplications = async () => {
+      setApplicationsLoading(true);
+      setApplicationsLoadError("");
+      try {
+        const response = await fetch(`${API_URL}/api/bench-club/my-applications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.data)) {
+          throw new Error(data.error || "Failed to load your previous applications.");
+        }
+
+        if (cancelled) return;
+        const applications = data.data as ExistingApplication[];
+        setExistingApplications(applications);
+
+        const previousApplication = applications[0];
+        if (previousApplication) {
+          setFormData((previous) => ({
+            ...previous,
+            fullName: previousApplication.name || user.name || previous.fullName,
+            email: previousApplication.email || user.email || previous.email,
+            socialHandle: previousApplication.instagram_handle || previous.socialHandle,
+            phoneNumber: previousApplication.phone_number || previous.phoneNumber,
+            country: previousApplication.country || previous.country,
+            ageGroup: previousApplication.age_group === "18+" || previousApplication.age_group === "13-17"
+              ? previousApplication.age_group
+              : previous.ageGroup,
+            parentGuardianEmail: previousApplication.parent_guardian_email || previous.parentGuardianEmail,
+            mediaPermission: Boolean(previousApplication.media_permission),
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to load previous applications:", error);
+        if (!cancelled) {
+          setApplicationsLoadError("We couldn't load your previous application details. Please try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setApplicationsLoading(false);
+        }
+      }
+    };
+
+    void loadPreviousApplications();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -198,12 +287,37 @@ const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
       return;
     }
 
+    if (applicationsLoading || applicationsLoadError) {
+      toast.error(applicationsLoadError || "Please wait while we check your previous applications.");
+      return;
+    }
+
+    if (hasActiveApplication(existingApplications, lift, weightTier)) {
+      toast.error(`You already have a pending or approved ${lift} application for ${weightTier} lbs.`);
+      return;
+    }
+
     setLoading(true);
     setUploadProgress(0);
     setStep("uploading");
 
     try {
       const token = localStorage.getItem('auth_token');
+
+      const applicationsResponse = await fetch(`${API_URL}/api/bench-club/my-applications`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const applicationsData = await applicationsResponse.json();
+      if (!applicationsResponse.ok || !Array.isArray(applicationsData.data)) {
+        throw new Error(applicationsData.error || "Couldn't check your previous applications.");
+      }
+      const latestApplications = applicationsData.data as ExistingApplication[];
+      setExistingApplications(latestApplications);
+      if (hasActiveApplication(latestApplications, lift, weightTier)) {
+        setStep("idle");
+        toast.error(`You already have a pending or approved ${lift} application for ${weightTier} lbs.`);
+        return;
+      }
 
       // 1. Upload video with progress
       let videoUrl: string;
@@ -366,6 +480,11 @@ const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
 
   const isUnder13 = formData.ageGroup === "under-13";
   const isTeen = formData.ageGroup === "13-17";
+  const selectedTierAlreadyApplied = Boolean(
+    formData.lift &&
+    formData.weightTier &&
+    hasActiveApplication(existingApplications, formData.lift, formData.weightTier)
+  );
 
   return (
     <motion.div
@@ -535,11 +654,32 @@ const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
               >
                 <option value="">Select an Option...</option>
                 {weightOptions.map(opt => (
-                  <option key={opt} value={opt}>{opt} lbs</option>
+                  <option
+                    key={opt}
+                    value={opt}
+                    disabled={hasActiveApplication(existingApplications, formData.lift, opt)}
+                  >
+                    {opt} lbs{hasActiveApplication(existingApplications, formData.lift, opt) ? " — Already applied" : ""}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
+          {applicationsLoading && (
+            <p className="font-body text-sm text-gray-500" role="status">
+              Loading your previous application details...
+            </p>
+          )}
+          {applicationsLoadError && (
+            <p className="font-body text-sm text-red-600" role="alert">
+              {applicationsLoadError}
+            </p>
+          )}
+          {selectedTierAlreadyApplied && (
+            <p className="font-body text-sm text-red-600" role="alert">
+              You already have a pending or approved application for this lift and weight tier. Please choose another tier.
+            </p>
+          )}
 
           {/* ✅ ADDITION 3 — Age Verification */}
           {/* <div>
@@ -742,7 +882,7 @@ const MySubmitLift = ({ onSuccess }: BenchClubFormProps) => {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={loading || isUnder13}
+              disabled={loading || isUnder13 || applicationsLoading || Boolean(applicationsLoadError) || selectedTierAlreadyApplied}
               className="group w-full relative bg-black text-white font-body text-sm tracking-[0.15em] uppercase px-8 py-4 overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed rounded-lg"
             >
               <span className="absolute inset-0 bg-[#B8860B] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
