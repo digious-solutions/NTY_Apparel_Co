@@ -10,6 +10,26 @@ interface BenchClubFormProps {
   onSuccess?: () => void;
 }
 
+type ExistingApplication = {
+  lift_type: string;
+  weight_tier: number;
+  status: string;
+};
+
+const hasActiveApplication = (
+  applications: ExistingApplication[],
+  lift: string,
+  weightTier: string,
+) => applications.some((application) => {
+  const status = application.status.toLowerCase();
+  const applicationLift = application.lift_type.trim().toLowerCase();
+  return (
+    (status === "pending" || status === "approved") &&
+    Number(application.weight_tier) === Number(weightTier) &&
+    (applicationLift === lift.trim().toLowerCase() || applicationLift === "both")
+  );
+});
+
 const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687.hostingersite.com";
 
 // ✅ ADDITION 1 — Country list (US first, rest alphabetical)
@@ -42,7 +62,7 @@ const COUNTRIES = [
 ];
 
 const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -62,6 +82,9 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
     consentConfirmed: false,
   });
   const [loading, setLoading] = useState(false);
+  const [existingApplications, setExistingApplications] = useState<ExistingApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [applicationsLoadError, setApplicationsLoadError] = useState("");
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -85,6 +108,46 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !token) {
+      setExistingApplications([]);
+      setApplicationsLoadError("");
+      return;
+    }
+
+    let cancelled = false;
+    const loadApplications = async () => {
+      setApplicationsLoading(true);
+      setApplicationsLoadError("");
+      try {
+        const response = await fetch(`${API_URL}/api/bench-club/my-applications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.data)) {
+          throw new Error(data.error || "Failed to check your existing applications.");
+        }
+        if (!cancelled) {
+          setExistingApplications(data.data);
+        }
+      } catch (error) {
+        console.error("Failed to load existing applications:", error);
+        if (!cancelled) {
+          setApplicationsLoadError("We couldn't check your existing applications. Please try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setApplicationsLoading(false);
+        }
+      }
+    };
+
+    void loadApplications();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -198,12 +261,31 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
       return;
     }
 
+    if (hasActiveApplication(existingApplications, lift, weightTier)) {
+      toast.error(`You already have a pending or approved ${lift} application for ${weightTier} lbs.`);
+      return;
+    }
+
     setLoading(true);
     setUploadProgress(0);
     setStep("uploading");
 
     try {
       const token = localStorage.getItem('auth_token');
+
+      const applicationsResponse = await fetch(`${API_URL}/api/bench-club/my-applications`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const applicationsData = await applicationsResponse.json();
+      if (!applicationsResponse.ok || !Array.isArray(applicationsData.data)) {
+        throw new Error(applicationsData.error || "Couldn't check your existing applications.");
+      }
+      setExistingApplications(applicationsData.data);
+      if (hasActiveApplication(applicationsData.data, lift, weightTier)) {
+        setStep("idle");
+        toast.error(`You already have a pending or approved ${lift} application for ${weightTier} lbs.`);
+        return;
+      }
 
       // 1. Upload video with progress
       let videoUrl: string;
@@ -366,6 +448,11 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
 
   const isUnder13 = formData.ageGroup === "under-13";
   const isTeen = formData.ageGroup === "13-17";
+  const selectedTierAlreadyApplied = Boolean(
+    formData.lift &&
+    formData.weightTier &&
+    hasActiveApplication(existingApplications, formData.lift, formData.weightTier)
+  );
 
   return (
     <motion.div
@@ -534,12 +621,32 @@ const BenchClubForm = ({ onSuccess }: BenchClubFormProps) => {
                 disabled={loading || !formData.lift}
               >
                 <option value="">Select an Option...</option>
-                {weightOptions.map(opt => (
-                  <option key={opt} value={opt}>{opt} lbs</option>
-                ))}
+                {weightOptions.map(opt => {
+                  const alreadyApplied = hasActiveApplication(existingApplications, formData.lift, opt);
+                  return (
+                    <option key={opt} value={opt} disabled={alreadyApplied}>
+                      {opt} lbs{alreadyApplied ? " - Applied" : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
+          {applicationsLoading && (
+            <p className="font-body text-sm text-gray-500" role="status">
+              Checking your existing applications...
+            </p>
+          )}
+          {applicationsLoadError && (
+            <p className="font-body text-sm text-red-600" role="alert">
+              {applicationsLoadError}
+            </p>
+          )}
+          {selectedTierAlreadyApplied && (
+            <p className="font-body text-sm text-red-600" role="alert">
+              You already have a pending or approved application for this lift and weight tier. Please choose another tier.
+            </p>
+          )}
 
           {/* ✅ ADDITION 3 — Age Verification */}
           <div>

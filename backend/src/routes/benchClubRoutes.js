@@ -106,6 +106,8 @@ router.post('/upload-video', authenticateToken, upload.single('video'), async (r
 // ✅ Submit Application
 router.post('/apply', authenticateToken, async (req, res) => {
   const startTime = Date.now();
+  let connection;
+  let transactionActive = false;
 
   try {
     const {
@@ -125,11 +127,19 @@ router.post('/apply', authenticateToken, async (req, res) => {
       consentConfirmed,
     } = req.body;
 
-    if (!user_id || !fullName || !email || !socialHandle || !lift || !weightTier || !videoUrl) {
+    if (!fullName || !email || !socialHandle || !lift || !weightTier || !videoUrl) {
       return res.status(400).json({
         success: false,
         error: 'All required fields must be filled.',
-        required: ['user_id', 'fullName', 'email', 'socialHandle', 'lift', 'weightTier', 'videoUrl'],
+        required: ['fullName', 'email', 'socialHandle', 'lift', 'weightTier', 'videoUrl'],
+      });
+    }
+
+    const authenticatedUserId = Number(req.user.id);
+    if (!authenticatedUserId || (user_id && Number(user_id) !== authenticatedUserId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'The application user does not match the authenticated account.',
       });
     }
 
@@ -137,6 +147,20 @@ router.post('/apply', authenticateToken, async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Country is required.',
+      });
+    }
+
+    const normalizedLift = typeof lift === 'string' ? lift.trim().toLowerCase() : '';
+    const parsedWeightTier = Number(weightTier);
+    const allowedTiers = normalizedLift === 'bench press'
+      ? [225, 315, 405, 500]
+      : normalizedLift === 'deadlift'
+        ? [225, 315, 405, 500, 600, 700]
+        : [];
+    if (!allowedTiers.includes(parsedWeightTier)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select a valid lift and weight tier.',
       });
     }
 
@@ -171,32 +195,57 @@ router.post('/apply', authenticateToken, async (req, res) => {
       });
     }
 
-    const [userCheck] = await pool.execute(
-      'SELECT COUNT(*) as count FROM users WHERE id = ?',
-      [user_id]
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    transactionActive = true;
+    const [userCheck] = await connection.execute(
+      'SELECT id FROM users WHERE id = ? FOR UPDATE',
+      [authenticatedUserId]
     );
 
-    const userExists = userCheck[0]?.count > 0;
-
-    if (!userExists) {
+    if (userCheck.length === 0) {
+      await connection.rollback();
+      transactionActive = false;
       return res.status(404).json({
         success: false,
         error: 'User not found. Please login again.',
       });
     }
 
-    const [result] = await pool.execute(
+    const normalizedEmail = req.user.email.trim().toLowerCase();
+    const [existingApplications] = await connection.execute(
+      `SELECT id, status
+       FROM bench_club_applications
+       WHERE (user_id = ? OR LOWER(TRIM(email)) = ?)
+         AND weight_tier = ?
+         AND (LOWER(TRIM(lift_type)) = ? OR LOWER(TRIM(lift_type)) = 'both')
+         AND status IN ('pending', 'approved')
+       LIMIT 1
+       FOR UPDATE`,
+      [authenticatedUserId, normalizedEmail, parsedWeightTier, normalizedLift]
+    );
+
+    if (existingApplications.length > 0) {
+      await connection.rollback();
+      transactionActive = false;
+      return res.status(409).json({
+        success: false,
+        error: `You already have a ${existingApplications[0].status} application for this lift and weight tier.`,
+      });
+    }
+
+    const [result] = await connection.execute(
       `INSERT INTO bench_club_applications 
        (user_id, full_name, email, instagram_handle, phone_number, lift_type, weight_tier, video_url, additional_notes, country, age_group, parent_guardian_email, media_permission, footage_approved_for_promo, consent_timestamp, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'pending', NOW())`,
       [
-        user_id,
+        authenticatedUserId,
         fullName.trim().substring(0, 100),
         email.trim().toLowerCase().substring(0, 100),
         socialHandle.trim().substring(0, 50),
         phoneNumber ? phoneNumber.trim().substring(0, 20) : null,
         lift.trim().substring(0, 50),
-        parseInt(weightTier, 10) || 0,
+        parsedWeightTier,
         videoUrl.trim().substring(0, 500),
         additionalNotes ? additionalNotes.trim().substring(0, 500) : null,
         country.trim().substring(0, 100),
@@ -206,6 +255,8 @@ router.post('/apply', authenticateToken, async (req, res) => {
         ageGroup === '18+' && mediaPermission,
       ]
     );
+    await connection.commit();
+    transactionActive = false;
 
     const insertId = result.insertId;
     const responseTime = Date.now() - startTime;
@@ -217,7 +268,7 @@ router.post('/apply', authenticateToken, async (req, res) => {
       message: 'Application submitted successfully!',
       data: {
         id: insertId,
-        user_id,
+        user_id: authenticatedUserId,
         video_url: videoUrl,
         status: 'pending',
         consent_confirmed: true,
@@ -226,6 +277,10 @@ router.post('/apply', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
+    if (connection && transactionActive) {
+      await connection.rollback();
+      transactionActive = false;
+    }
     const responseTime = Date.now() - startTime;
     console.error(`❌ Submit Error (${responseTime}ms):`, error);
 
@@ -240,6 +295,8 @@ router.post('/apply', authenticateToken, async (req, res) => {
       success: false,
       error: 'Something went wrong. Please try again.',
     });
+  } finally {
+    connection?.release();
   }
 });
 
@@ -254,6 +311,7 @@ router.get('/my-applications', authenticateToken, async (req, res) => {
         full_name as name, 
         email, 
         instagram_handle, 
+        phone_number,
         lift_type, 
         weight_tier, 
         video_url, 

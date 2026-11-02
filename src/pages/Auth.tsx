@@ -8,8 +8,9 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signIn, signUp } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, claimAccount } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [emailChecked, setEmailChecked] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,6 +22,7 @@ const Auth = () => {
 
   // ✅ Forgot Password States
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [claimingAccount, setClaimingAccount] = useState(false);
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -82,6 +84,50 @@ const Auth = () => {
     e.preventDefault();
     if (loading || authLoading) return;
 
+    if (mode === "login" && !emailChecked) {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_URL}/api/auth/check-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to check this email.");
+        }
+
+        if (data.data?.hasAccount) {
+          setEmailChecked(true);
+          toast.success("Email found. Enter your password to sign in.");
+        } else if (data.data?.canClaimAccount) {
+          setResetEmail(normalizedEmail);
+          setClaimingAccount(true);
+          setShowForgotPassword(true);
+          setOtp("");
+          setNewPassword("");
+          setConfirmNewPassword("");
+          setOtpVerified(false);
+          setOtpSent(false);
+          await handleSendOtp(normalizedEmail);
+        } else {
+          throw new Error("No account or application was found with this email.");
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to check this email.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (mode === "signup" && password !== confirmPassword) {
       toast.error("Passwords do not match.");
       return;
@@ -113,18 +159,20 @@ const Auth = () => {
   };
 
   // ✅ Send OTP for Forgot Password
-  const handleSendOtp = async () => {
-    if (!resetEmail || !resetEmail.includes('@')) {
+  const handleSendOtp = async (emailToSend = resetEmail) => {
+    const normalizedEmail = emailToSend.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
       toast.error("Please enter a valid email address.");
       return;
     }
 
     setForgotLoading(true);
     try {
+      setResetEmail(normalizedEmail);
       const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: resetEmail.toLowerCase().trim() }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
 
       const data = await response.json();
@@ -189,6 +237,19 @@ const Auth = () => {
 
     setForgotLoading(true);
     try {
+      if (claimingAccount) {
+        await claimAccount(resetEmail.toLowerCase().trim(), otp.trim(), newPassword);
+        setShowForgotPassword(false);
+        setClaimingAccount(false);
+        setOtpSent(false);
+        setOtpVerified(false);
+        setResetEmail("");
+        setOtp("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,6 +268,7 @@ const Auth = () => {
 
       toast.success("Password reset successfully! Please login.");
       setShowForgotPassword(false);
+      setClaimingAccount(false);
       setOtpSent(false);
       setOtpVerified(false);
       setResetEmail("");
@@ -223,6 +285,7 @@ const Auth = () => {
   // ✅ Reset Forgot Password Flow
   const resetForgotPassword = () => {
     setShowForgotPassword(false);
+    setClaimingAccount(false);
     setOtpSent(false);
     setOtpVerified(false);
     setResetEmail("");
@@ -269,12 +332,12 @@ const Auth = () => {
           </button>
 
           <h1 className="text-3xl tracking-widest mb-2" style={{ fontFamily: "'Arial Black', sans-serif" }}>
-            RESET PASSWORD
+            {claimingAccount ? "WE RECOGNIZE YOU" : "RESET PASSWORD"}
           </h1>
           <p className="text-sm text-muted-foreground mb-8 uppercase tracking-wider">
             {!otpSent ? "Enter your email to receive OTP" :
               !otpVerified ? "Enter the 6-digit OTP sent to your email" :
-                "Set your new password"}
+                claimingAccount ? "Set a password for your account" : "Set your new password"}
           </p>
 
           {!otpSent ? (
@@ -319,7 +382,7 @@ const Auth = () => {
               </button>
               <button
                 type="button"
-                onClick={handleSendOtp}
+                onClick={() => handleSendOtp()}
                 className="w-full text-xs text-muted-foreground hover:text-foreground transition"
               >
                 Resend OTP
@@ -370,7 +433,7 @@ const Auth = () => {
                 disabled={forgotLoading || !newPassword || !confirmNewPassword}
                 className="w-full bg-foreground text-background py-3 text-sm tracking-[0.2em] uppercase hover:opacity-90 transition disabled:opacity-50"
               >
-                {forgotLoading ? "Resetting..." : "Reset Password"}
+                {forgotLoading ? "Saving..." : claimingAccount ? "Create Account" : "Reset Password"}
               </button>
             </form>
           )}
@@ -408,19 +471,22 @@ const Auth = () => {
             type="email"
             placeholder="Email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setEmailChecked(false);
+            }}
             required
             autoComplete="email"
             className="w-full bg-transparent border border-border px-4 py-3 text-sm focus:outline-none focus:border-foreground"
           />
 
-          <div className="relative">
+          {(mode === "signup" || emailChecked) && <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              required={mode === "signup" || emailChecked}
               minLength={6}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               className="w-full bg-transparent border border-border px-4 py-3 text-sm focus:outline-none focus:border-foreground pr-12"
@@ -433,7 +499,7 @@ const Auth = () => {
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
-          </div>
+          </div>}
 
           {mode === "signup" && (
             <div className="relative">
@@ -462,7 +528,10 @@ const Auth = () => {
             <div className="text-right">
               <button
                 type="button"
-                onClick={() => setShowForgotPassword(true)}
+                onClick={() => {
+                  setClaimingAccount(false);
+                  setShowForgotPassword(true);
+                }}
                 className="text-xs text-muted-foreground hover:text-foreground transition"
               >
                 Forgot Password?
@@ -472,16 +541,17 @@ const Auth = () => {
 
           <button
             type="submit"
-            disabled={loading || authLoading}
+            disabled={loading || authLoading || (mode === "login" && !email.trim())}
             className="w-full bg-foreground text-background py-3 text-sm tracking-[0.2em] uppercase hover:opacity-90 transition disabled:opacity-50"
           >
-            {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
+            {loading ? "..." : mode === "login" ? emailChecked ? "Sign In" : "Continue" : "Create Account"}
           </button>
         </form>
 
         <button
           onClick={() => {
             setMode(mode === "login" ? "signup" : "login");
+            setEmailChecked(false);
             setPassword("");
             setConfirmPassword("");
             setShowPassword(false);
