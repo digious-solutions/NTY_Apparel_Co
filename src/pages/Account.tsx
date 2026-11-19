@@ -9,10 +9,12 @@ import { MyOrders } from "@/components/account/MyOrders";
 import { MyCodes } from "@/components/account/MyCodes";
 import { MyAffiliate } from "@/components/account/MyAffiliate";
 import { MyBenchClub } from "@/components/account/MyBenchClub";
-import  MySubmitLift  from "@/components/account/MySubmitLift";
+import MySubmitLift from "@/components/account/MySubmitLift";
+import { MyShop } from "@/components/account/MyShop";
 import { Gift, Package, User, MapPin, LogOut, Ticket, Users, Dumbbell, Upload } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
-type Section = "rewards" | "orders" | "codes" | "benchclub" | "submitalift" | "affiliate" | "details" | "addresses";
+type Section = "rewards" | "orders" | "codes" | "benchclub" | "submitalift" | "affiliate" | "details" | "addresses" | "shop";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   // { key: "rewards", label: "Rewards", icon: Gift },
@@ -20,6 +22,7 @@ const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   // { key: "codes", label: "Codes", icon: Ticket },
   { key: "benchclub", label: "Natty Verified", icon: Dumbbell },
   { key: "submitalift", label: "Submit a lift", icon: Upload },
+  { key: "shop", label: "Shop", icon: Package },
   { key: "affiliate", label: "Affiliate Dashboard", icon: Users },
   { key: "details", label: "Account Details", icon: User },
   { key: "addresses", label: "Addresses", icon: MapPin },
@@ -29,9 +32,18 @@ const API_URL = import.meta.env.VITE_API_URL || "https://slategrey-cattle-753687
 
 const Account = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams(); // 👈 Yeh add karein
   const { user, loading, signOut, updateUser } = useAuth(); // ✅ Add updateUser
   const [section, setSection] = useState<Section>("benchclub");
   const [displayName, setDisplayName] = useState("");
+
+  const initialTab = (searchParams.get("tab") as Section) || "benchclub";
+  useEffect(() => {
+    const tab = searchParams.get("tab") as Section;
+    if (tab && NAV.some(item => item.key === tab)) {
+      setSection(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // ✅ If not logged in, redirect to auth
@@ -131,10 +143,12 @@ const Account = () => {
                   return (
                     <button
                       key={item.key}
-                      onClick={() => setSection(item.key)}
-                      className={`w-full flex items-center gap-3 px-5 py-4 text-left text-sm tracking-wide border-b border-foreground/10 last:border-b-0 transition ${
-                        active ? "bg-foreground text-background" : "hover:bg-foreground/5"
-                      }`}
+                      onClick={() => {
+                        setSection(item.key);
+                        navigate(`/account?tab=${item.key}`, { replace: true });
+                      }}
+                      className={`w-full flex items-center gap-3 px-5 py-4 text-left text-sm tracking-wide border-b border-foreground/10 last:border-b-0 transition ${active ? "bg-foreground text-background" : "hover:bg-foreground/5"
+                        }`}
                     >
                       <Icon className="w-4 h-4" strokeWidth={1.5} />
                       <span>{item.label}</span>
@@ -164,6 +178,7 @@ const Account = () => {
               {section === "codes" && <MyCodes email={user.email} />}
               {section === "benchclub" && <MyBenchClub />}
               {section === "submitalift" && <MySubmitLift />}
+              {section === "shop" && <MyShop />}
               {section === "affiliate" && <MyAffiliate email={user.email} />}
               {section === "details" && (
                 <AccountDetails
@@ -177,8 +192,8 @@ const Account = () => {
             </div>
           </div>
         </main>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
@@ -226,12 +241,12 @@ function AccountDetails({
       }
 
       toast.success("Saved successfully");
-      
+
       // ✅ Update local state
       setName(name.trim());
       // ✅ Call parent callback to update context and localStorage
       onSaved(name.trim());
-      
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save");
     } finally {

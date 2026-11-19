@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 const navLinks = [
-  { to: "https://ntygear.com/collections/all", label: "Shop" },
+  { to: "/account?tab=shop", label: "Shop" },
   { to: "https://ntygear.com/pages/the-nty-story", label: "The NTY Story" },
   { to: "https://ntygear.com/pages/partners", label: "Partner Program" },
   { to: "https://ntygear.com/pages/natty-verified", label: "Natty Verified" },

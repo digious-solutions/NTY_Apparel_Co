@@ -498,109 +498,16 @@ export function MyBenchClub() {
         </div>
       </section>
 
-      <TierLadder
+      {/* <TierLadder
         title="Bench Club Tier Ladder"
         tiers={TIERS}
         isMember={isMember}
         currentTier={currentBenchTier}
         maxTier={maxBenchTier}
-      />
+      /> */}
 
-      {/* ============================================================
-          NEW: TIER PRODUCTS SECTION - UNLOCKS WITH TIER PROGRESS
-          ============================================================ */}
-      <section className="border border-foreground/10 bg-card p-6 rounded-lg">
-        <div className="flex items-center gap-2 mb-5">
-          <ShoppingBag className="w-4 h-4" />
-          <h4 className="text-sm tracking-[0.2em] uppercase">Bench Club Tier Products</h4>
-          {isMember && (
-            <span className="text-xs text-muted-foreground ml-auto">
-              {TIER_PRODUCTS.filter((product) => isTierUnlocked(product.lbs)).length} / {TIER_PRODUCTS.length} unlocked
-            </span>
-          )}
-        </div>
 
-        {!isMember ? (
-          <div className="text-center py-8">
-            <Lock className="w-10 h-10 mx-auto text-gray-300 mb-3" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">Become a member to unlock tier products.</p>
-            <a href="/natty-verification" className="inline-block mt-3 text-[#B8860B] hover:underline text-sm font-medium">
-              Apply Now →
-            </a>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {TIER_PRODUCTS.map((product) => {
-              const isUnlocked = isTierUnlocked(product.lbs);
-
-              return (
-                <div
-                  key={product.lbs}
-                  className={`group relative border rounded-lg overflow-hidden transition-all ${isUnlocked
-                    ? "border-[#B8860B]/30 hover:border-[#B8860B] hover:shadow-lg hover:shadow-[#B8860B]/10"
-                    : "border-gray-200 opacity-60"
-                    }`}
-                >
-                  {/* Product Image */}
-                  <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {/* Lock Overlay for locked products */}
-                    {/* {!isUnlocked && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <Lock className="w-8 h-8 text-white/80" strokeWidth={1.5} />
-                      </div>
-                    )} */}
-                    {/* Unlocked Badge */}
-                    {isUnlocked && (
-                      <div className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-medium px-2 py-1 rounded">
-                        ✓ Unlocked
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[13px] font-semibold tracking-[0.2em] uppercase text-muted-foreground">
-                          {product.lbs} lbs Club
-                        </p>
-                        {/* <h5 className="font-semibold text-sm mt-0.5">{product.name}</h5> */}
-                      </div>
-                      <span className="font-bold text-[#B8860B]">{product.price}</span>
-                    </div>
-
-                    {/* Action Button */}
-                    {isUnlocked ? (
-                      <a
-                        href={`https://ntygear.com/products/${product.handle}`}
-                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-[#141414] text-white px-4 py-2 text-xs tracking-[0.2em] uppercase hover:bg-[#2a2a2a] transition rounded"
-                      >
-                        <ShoppingBag className="w-3.5 h-3.5" />
-                        Shop Now
-                      </a>
-                    ) : (
-                      <button
-                        disabled
-                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-gray-200 text-gray-500 px-4 py-2 text-xs tracking-[0.2em] uppercase rounded cursor-not-allowed"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        Locked
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {isDeadliftMember && (
+      {/* {isDeadliftMember && (
         <TierLadder
           title="Deadlift Tier Ladder"
           tiers={DEADLIFT_TIERS}
@@ -608,94 +515,9 @@ export function MyBenchClub() {
           currentTier={currentDeadliftTier}
           maxTier={maxDeadliftTier}
         />
-      )}
-
+      )} */}
+      
       {/* Deadlift products unlock only for Deadlift or Both members, by their verified tier. */}
-      <section className="border border-foreground/10 bg-card p-6 rounded-lg">
-        <div className="flex items-center gap-2 mb-5">
-          <ShoppingBag className="w-4 h-4" />
-          <h4 className="text-sm tracking-[0.2em] uppercase">Deadlift Tier Products</h4>
-          {isDeadliftMember && (
-            <span className="text-xs text-muted-foreground ml-auto">
-              {DEADLIFT_TIER_PRODUCTS.filter((product) => isDeadliftTierUnlocked(product.lbs)).length} / {DEADLIFT_TIER_PRODUCTS.length} unlocked
-            </span>
-          )}
-        </div>
-
-        {!isDeadliftMember && (
-          <div className="text-center py-5 mb-5 border border-dashed border-foreground/15 rounded-lg">
-            <Lock className="w-10 h-10 mx-auto text-gray-300 mb-3" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">Deadlift products are for verified Deadlift Club members.</p>
-            <a href="/natty-verification" className="inline-block mt-3 text-[#B8860B] hover:underline text-sm font-medium">
-              Apply Now →
-            </a>
-          </div>
-        )}
-        {isDeadliftMember && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {DEADLIFT_TIER_PRODUCTS.map((product) => {
-              const isUnlocked = isDeadliftTierUnlocked(product.lbs);
-
-              return (
-                <div
-                  key={product.lbs}
-                  className={`group relative border rounded-lg overflow-hidden transition-all ${isUnlocked
-                    ? "border-[#B8860B]/30 hover:border-[#B8860B] hover:shadow-lg hover:shadow-[#B8860B]/10"
-                    : "border-gray-200 opacity-70"
-                    }`}
-                >
-                  <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {isUnlocked ? (
-                      <div className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-medium px-2 py-1 rounded">
-                        ✓ Unlocked
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
-                        {/* <Lock className="w-8 h-8 text-white" strokeWidth={1.5} /> */}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[13px] font-semibold tracking-[0.2em] uppercase text-muted-foreground">
-                          {product.lbs} lbs Club
-                        </p>
-                        {/* <h5 className="font-semibold text-sm mt-1">{product.name}</h5> */}
-                      </div>
-                      <span className="font-bold text-[#B8860B]">{product.price}</span>
-                    </div>
-
-                    {isUnlocked ? (
-                      <a
-                        href={`https://ntygear.com/products/${product.handle}`}
-                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-[#141414] text-white px-4 py-2 text-xs tracking-[0.2em] uppercase hover:bg-[#2a2a2a] transition rounded"
-                      >
-                        <ShoppingBag className="w-3.5 h-3.5" />
-                        Shop Now
-                      </a>
-                    ) : (
-                      <button
-                        disabled
-                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-gray-200 text-gray-500 px-4 py-2 text-xs tracking-[0.2em] uppercase rounded cursor-not-allowed"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        Locked
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
